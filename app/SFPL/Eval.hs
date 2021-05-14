@@ -205,9 +205,8 @@ readInt = readLine >>- ret (parseInt $| Var 0)
 
 myProg =
   putsln $| "Hello!" >>>
-  putsln $| "Please enter a number: " >>>
+  puts $| "Please enter a number: " >>>
   readInt >>- (
-  putc (c '\n') >>>
   puts $| "The factorial of " >>> print' (Var 1) >>> puts $| " is: " >>> printLn $| (fact $| Var 1))
   
 
