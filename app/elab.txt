@@ -1,0 +1,10 @@
+type Metacontext = { map :: HashMap Metavar Entry, nextMeta :: Metavar }
+data Entry = Solved VTy | Unsolved
+
+data ElabCxt = {
+  dataTypes :: []
+  dataConstructors :: []
+  topLevelDefs :: []
+  typeNames :: HashMap
+  termNames :: HashMap String -> Either Lvl (Ty, Lvl)
+}

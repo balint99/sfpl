@@ -1,0 +1,46 @@
+cabal-version:      2.4
+name:               sfpl
+version:            1.0.0.0
+synopsis:           A simple functional programming language
+
+-- A longer description of the package.
+-- description:
+homepage:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+license:            NONE
+author:             Bálint Kocsis
+maintainer:         hmso28@INF.ELTE.HU
+
+-- A copyright notice.
+-- copyright:
+category:           Language
+extra-source-files: CHANGELOG.md
+
+executable sfpl
+    main-is:          Main.hs
+
+    -- Modules included in this executable, other than Main.
+    other-modules: SFPL.Base, SFPL.Elab, SFPL.Elab.Metacontext, SFPL.Elab.Types,
+                   SFPL.Eval, SFPL.Eval.Instances, SFPL.Eval.Internal, SFPL.Eval.Pretty,
+                   SFPL.Eval.Types, SFPL.Parser, SFPL.Parser.Expr,
+                   SFPL.Syntax.Core, SFPL.Syntax.Core.Instances, SFPL.Syntax.Core.Pretty,
+                   SFPL.Syntax.Core.Types, SFPL.Syntax.Raw, SFPL.Syntax.Raw.Instances,
+                   SFPL.Syntax.Raw.Pretty, SFPL.Syntax.Raw.Types, SFPL.Utils
+
+    -- LANGUAGE extensions used by modules in this package.
+    other-extensions: ConstraintKinds, DerivingVia, FlexibleContexts, FlexibleInstances,
+                      KindSignatures, LambdaCase, MultiParamTypeClasses, OverloadedLists,
+                      OverloadedStrings, PatternSynonyms, StandaloneDeriving, TupleSections,
+                      TypeFamilies, ViewPatterns
+    build-depends:    array ^>= 0.5.4,
+                      base ^>= 4.14.1,
+                      hashable ^>= 1.3.1,
+                      megaparsec ^>= 9.0.1,
+                      mtl ^>= 2.2.2,
+                      parser-combinators ^>= 1.3.0,
+                      pretty ^>= 1.1.3.6,
+                      unordered-containers ^>= 0.2.13
+    hs-source-dirs:   app
+    default-language: Haskell2010
