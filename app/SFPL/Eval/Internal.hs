@@ -7,10 +7,11 @@ import Control.Monad.Reader
 import Data.Array.IArray ((!))
 import Data.Bits
 import Data.Char (ord, chr)
+import Data.List (intercalate)
 import SFPL.Base
 import SFPL.Elab.Metacontext
 import SFPL.Eval.Types
-import SFPL.Eval.Pretty
+import SFPL.Eval.Instances
 import SFPL.Syntax.Core
 import SFPL.Utils
 
@@ -64,6 +65,7 @@ evalTSp env = \case
   []      -> pure []
   sp :> a -> (:>) <$> evalTSp env sp <*> evalTy env a
 
+-- | Convert de-Bruijn level to index.
 lvl2Ix :: Lvl -> Lvl -> Ix
 lvl2Ix (Lvl n) (Lvl l) = Ix (n - l - 1)
 
@@ -93,7 +95,7 @@ quoteTSp n = \case
 --
 -- @since 1.0.0
 showVTy :: MonadMeta m => TyPCxt -> VTy -> m String
-showVTy cxt@(xs, _) va = showTy cxt <$> quoteTy (Lvl $ length xs) va
+showVTy cxt@(xs, _) va = showPretty cxt <$> quoteTy (Lvl $ length xs) va
 
 -- | Forcing of metavariables.
 --
@@ -108,6 +110,16 @@ forceTy = \case
 
 ------------------------------------------------------------
 -- Terms
+
+-- Convert a value to a string.
+valToString :: Val -> EvalP String
+valToString vt = ask >>= \(_, ctrs) -> pure $ showPretty ctrs vt
+
+-- Helper for evaluation errors.
+devEvalError :: String -> [Val] -> EvalP a
+devEvalError s vts = do
+  xs <- valToString <$$> vts
+  devError $ s ++ intercalate ", " xs
 
 -- | Extend an environment with multiple values.
 (+>) :: Env -> [Val] -> Env
@@ -127,56 +139,56 @@ vApp :: Val -> Val -> EvalP Val
 vApp vt vu = case vt of
   VLam cl   -> cl $$ vu
   VCtr l sp -> pure $ VCtr l (sp :> vu)
-  _         -> devError $ "can only apply to lambda or constructor"
+  _         -> devEvalError "tried to apply " [vt]
 
 evalUnOp :: Env -> UnaryOp -> Tm -> EvalP Val
 evalUnOp env Pure t = pure . VIO $ VPure env t
-evalUnOp env op t = do
+evalUnOp env op   t = do
   vt <- eval env t
   case op of
-    Negate  -> pure $ case vt of
-      VInt n    -> VInt (-n)
-      VFloat n  -> VFloat (-n)
-      _         -> devError "can't negate"
-    BNot    -> pure $ case vt of
-      VInt n    -> VInt (complement n)
-      _         -> devError "can't take bitwise complement"
+    Negate  -> case vt of
+      VInt n    -> pure $ VInt (-n)
+      VFloat n  -> pure $ VFloat (-n)
+      _         -> devEvalError "can't negate " [vt]
+    BNot    -> case vt of
+      VInt n    -> pure $ VInt (complement n)
+      _         -> devEvalError "can't take bitwise complement of " [vt]
 
 evalBinOp :: Env -> BinaryOp -> Tm -> Tm -> EvalP Val
 evalBinOp env op t u = do
   vt <- eval env t
   vu <- eval env u
   case op of
-    Add   -> pure $ case (vt, vu) of
-      (VInt n,   VInt n'  ) -> VInt (n + n')
-      (VFloat n, VFloat n') -> VFloat (n + n')
-      _                     -> devError "can't add"
-    Sub   -> pure $ case (vt, vu) of
-      (VInt n,   VInt n'  ) -> VInt (n - n')
-      (VFloat n, VFloat n') -> VFloat (n - n')
-      _                     -> devError "can't subtract"
-    Mul   -> pure $ case (vt, vu) of
-      (VInt n,   VInt n'  ) -> VInt (n * n')
-      (VFloat n, VFloat n') -> VFloat (n * n')
-      _                     -> devError "can't multiply"
+    Add   -> case (vt, vu) of
+      (VInt n,   VInt n'  ) -> pure $ VInt (n + n')
+      (VFloat n, VFloat n') -> pure $ VFloat (n + n')
+      _                     -> devEvalError "can't add: " [vt, vu]
+    Sub   -> case (vt, vu) of
+      (VInt n,   VInt n'  ) -> pure $ VInt (n - n')
+      (VFloat n, VFloat n') -> pure $ VFloat (n - n')
+      _                     -> devEvalError "can't subtract: " [vt, vu]
+    Mul   -> case (vt, vu) of
+      (VInt n,   VInt n'  ) -> pure $ VInt (n * n')
+      (VFloat n, VFloat n') -> pure $ VFloat (n * n')
+      _                     -> devEvalError "can't multiply: " [vt, vu]
     Div   -> case (vt, vu) of
       (VInt n,   VInt n'  ) | n' == 0   -> throwError "divide by zero"
                             | otherwise -> pure $ VInt (n `div` n')
       (VFloat n, VFloat n') | n' == 0   -> throwError "divide by zero"
                             | otherwise -> pure $ VFloat (n / n')
-      _                     -> devError "can't divide"
+      _                     -> devEvalError "can't divide: " [vt, vu]
     Exp   -> case (vt, vu) of
       (VInt n,   VInt n'  ) | n' < 0    -> throwError "negative exponent"
                             | otherwise -> pure $ VInt (n ^ n')
-      (VFloat n, VFloat n') | n == 0 && n' < 0  -> throwError "invalid arguments"
+      (VFloat n, VFloat n') | n == 0 && n' < 0  -> throwError "invalid arguments to ^"
                             | otherwise         -> pure $ VFloat (n ** n')
-      _                     -> devError "can't exponentiate"
-    BAnd  -> pure $ case (vt, vu) of
-      (VInt n,   VInt n'  ) -> VInt (n .&. n')
-      _                     -> devError "can't take bitwise and"
-    BOr   -> pure $ case (vt, vu) of
-      (VInt n,   VInt n'  ) -> VInt (n .|. n')
-      _                     -> devError "can't take bitwise or"
+      _                     -> devEvalError "can't exponentiate: " [vt, vu]
+    BAnd  -> case (vt, vu) of
+      (VInt n,   VInt n'  ) -> pure $ VInt (n .&. n')
+      _                     -> devEvalError "can't take bitwise and: " [vt, vu]
+    BOr   -> case (vt, vu) of
+      (VInt n,   VInt n'  ) -> pure $ VInt (n .|. n')
+      _                     -> devEvalError "can't take bitwise or: " [vt, vu]
 
 evalNullFunc :: NullaryFunc -> EvalP Val
 evalNullFunc = pure . VIO . \case
@@ -187,23 +199,23 @@ evalNullFunc = pure . VIO . \case
 evalUnFunc :: Env -> UnaryFunc -> Tm -> EvalP Val
 evalUnFunc env Putc  t = pure . VIO $ VPutc env t
 evalUnFunc env Print t = pure . VIO $ VPrint env t
-evalUnFunc env f t = do
+evalUnFunc env f     t = do
   vt <- eval env t
   case f of
-    ToInt   -> pure $ case vt of
-      VInt n    -> VInt n
-      VFloat n  -> VInt (floor n)
-      VChar n   -> VInt (toInteger $ ord n)
-      _         -> devError "can't convert to integer"
-    ToFloat -> pure $ case vt of
-      VInt n    -> VFloat (fromInteger n)
-      VFloat n  -> VFloat n
-      _         -> devError "can't convert to floating point number"
-    ToChar  -> pure $ case vt of
-      VInt n    -> VChar (chr $ fromInteger n)
-      VChar c   -> VChar c
-      _         -> devError "can't convert to character"
-    Error   -> ask >>= \(_, ctrs) -> throwError (showVal ctrs vt)
+    ToInt   -> case vt of
+      VInt n    -> pure $ VInt n
+      VFloat n  -> pure $ VInt (floor n)
+      VChar n   -> pure $ VInt (toInteger $ ord n)
+      _         -> devEvalError "can't convert to integer: " [vt]
+    ToFloat -> case vt of
+      VInt n    -> pure $ VFloat (fromInteger n)
+      VFloat n  -> pure $ VFloat n
+      _         -> devEvalError "can't convert to floating point number: " [vt]
+    ToChar  -> case vt of
+      VInt n    -> pure $ VChar (chr $ fromInteger n)
+      VChar c   -> pure $ VChar c
+      _         -> devEvalError "can't convert to character: " [vt]
+    Error   -> throwError =<< valToString vt
 
 boolToInt :: Bool -> Integer
 boolToInt b = if b then 1 else 0
@@ -213,20 +225,20 @@ evalBinFunc env f t u = do
   vt <- eval env t
   vu <- eval env u
   case f of
-    PrimEq  -> pure $ case (vt, vu) of
-      (VInt n  , VInt n'  ) -> VInt (boolToInt $ n == n')
-      (VFloat n, VFloat n') -> VInt (boolToInt $ n == n')
-      (VChar c , VChar c' ) -> VInt (boolToInt $ c == c')
-      _                     -> devError "can't compare"
-    PrimLt  -> pure $ case (vt, vu) of
-      (VInt n  , VInt n'  ) -> VInt (boolToInt $ n < n')
-      (VFloat n, VFloat n') -> VInt (boolToInt $ n < n')
-      (VChar c , VChar c' ) -> VInt (boolToInt $ c < c')
-      _                     -> devError "can't compare"
+    PrimEq  -> case (vt, vu) of
+      (VInt n  , VInt n'  ) -> pure $ VInt (boolToInt $ n == n')
+      (VFloat n, VFloat n') -> pure $ VInt (boolToInt $ n == n')
+      (VChar c , VChar c' ) -> pure $ VInt (boolToInt $ c == c')
+      _                     -> devEvalError "can't compare: " [vt, vu]
+    PrimLt  -> case (vt, vu) of
+      (VInt n  , VInt n'  ) -> pure $ VInt (boolToInt $ n < n')
+      (VFloat n, VFloat n') -> pure $ VInt (boolToInt $ n < n')
+      (VChar c , VChar c' ) -> pure $ VInt (boolToInt $ c < c')
+      _                     -> devEvalError "can't compare: " [vt, vu]
 
 caseSplit :: Env -> Val -> [CaseBranch] -> EvalP Val
 caseSplit env vt = \case
-  []      -> ask >>= \(_, ctrs) -> throwError $ "non-exhaustive patterns: " ++ showVal ctrs vt
+  []      -> throwError "non-exhaustive patterns"
   b : bs  -> let (p, t) = b in case (vt, p) of
     (VInt n     , PInt n'   ) | n == n'  -> eval env t
     (VFloat n   , PFloat n' ) | n == n'  -> eval env t
@@ -252,7 +264,7 @@ eval env = \case
   CharLit c     -> pure $ VChar c
   Tup ts        -> VTuple <$> (eval env <$$> ts)
   Ctr l         -> pure $ VCtr l []
-  UnOp op t     -> evalUnOp env op t 
+  UnOp op t     -> evalUnOp env op t
   BinOp op t u  -> evalBinOp env op t u
   NullFunc f    -> evalNullFunc f
   UnFunc f t    -> evalUnFunc env f t
@@ -277,25 +289,32 @@ liftPure p = do
     Left e  -> throwErr e
     Right a -> pure a
 
+valToStringP :: MonadRun m => Val -> m String
+valToStringP = liftPure . valToString
+
+evalP :: MonadRun m => Env -> Tm -> m Val
+evalP env = liftPure . eval env
+
+-- Helper for evaluation errors.
+devRunError :: MonadRun m => String -> [Val] -> m a
+devRunError s = liftPure . devEvalError s
+
 returnChar :: MonadRun m => Maybe Char -> m Val
 returnChar = maybe (throwErr "reached end of input") (pure . VChar)
 
 forcePutc :: MonadRun m => Env -> Tm -> m Val
 forcePutc env t = do
-  vt <- liftPure $ eval env t
+  vt <- evalP env t
   case vt of
     VChar c -> VUnit <$ write [c]
-    _       -> devError "can't put non-character"
+    _       -> devRunError "can't put " [vt]
 
 forcePrint :: MonadRun m => Env -> Tm -> m Val
-forcePrint env t = do
-  vt <- liftPure $ eval env t
-  ctrs <- getCtrNames
-  VUnit <$ write (showVal ctrs vt)
+forcePrint env t = VUnit <$ (write =<< valToStringP =<< evalP env t)
 
 forceIOVal :: MonadRun m => IOVal -> m Val
 forceIOVal = \case
-  VPure env t   -> liftPure $ eval env t
+  VPure env t   -> evalP env t
   VBind env t u -> run env t >>= \vt -> run (env :> vt) u
   VRead         -> readChar >>= returnChar
   VPeek         -> peekChar >>= returnChar
@@ -307,8 +326,8 @@ forceIOVal = \case
 forceIO :: MonadRun m => Val -> m Val
 forceIO = \case
   VIO v -> forceIOVal v
-  _     -> devError $ "tried to force non-IO value"
+  vt    -> devRunError "tried to force " [vt]
 
 -- | Evaluate a term with effects.
 run :: MonadRun m => Env -> Tm -> m Val
-run env = forceIO <=< liftPure . eval env
+run env = forceIO <=< evalP env

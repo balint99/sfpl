@@ -33,7 +33,7 @@ evalTm cxt t = runReaderT (eval [] t) cxt
 
 evalTest :: EvalCxt -> Tm -> IO ()
 evalTest cxt@(_, ctrs) t =
-  putStrLn . either prettyError (showVal ctrs) $ evalTm cxt t
+  putStrLn . either prettyError (showPretty ctrs) $ evalTm cxt t
   where
     prettyError s = "\nA runtime error occurred: " ++ s ++ "\n"
 
@@ -215,4 +215,4 @@ cxt1 = ( arr [iseof, printLn, readStdIn, fact]
        , arr ["true", "false", "nil", "cons", "nothing", "just"])
 
 runTm :: EvalCxt -> Tm -> IO ()
-runTm cxt t = runReaderT (() <$ run [] (t >>- printLn $| Var 0):: Eval ()) cxt
+runTm cxt t = runReaderT (() <$ run [] (t >>- printLn $| Var 0) :: Eval ()) cxt

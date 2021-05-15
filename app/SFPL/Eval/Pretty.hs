@@ -18,7 +18,7 @@ prettyChar c = text $ showLitChar c ""
 
 prettyCons :: CtrNames -> VSpine -> Doc
 prettyCons ctrs ([] :> hd :> tl) = case hd of
-  VChar c -> doubleQuotes . hcat . map (prettyChar . toChar) $ hd : toList tl
+  VChar _ -> doubleQuotes . hcat . map (prettyChar . toChar) $ hd : toList tl
   _       -> brackets . hjoin ", " . map (prettyVal LowP ctrs) $ hd : toList tl
   where
     toChar :: Val -> Char
