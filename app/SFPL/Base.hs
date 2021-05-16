@@ -129,8 +129,10 @@ newtype Lvl = Lvl { unLvl :: Int }
 newtype Metavar = Metavar { unMetavar :: Int }
   deriving
     ( Eq       -- ^ @since 1.0.0
+    , Ord      -- ^ @since 1.0.0
     , Show     -- ^ @since 1.0.0
     , Num      -- ^ @since 1.0.0
+    , Ix.Ix    -- ^ @since 1.0.0
     , Hashable -- ^ @since 1.0.0
     ) via Int
 

@@ -37,8 +37,8 @@ applyMeta a sp = evalTy sp a
 -- | Evaluate a metavariable.
 evalMeta :: MonadMeta m => Metavar -> VTSpine -> m VTy
 evalMeta m sp = do
-  entry <- lookupMeta m
-  case entry of
+  (metaSt, _) <- lookupMeta m
+  case metaSt of
     Solved a  -> applyMeta a sp
     Unsolved  -> pure $ VMeta m sp
 
@@ -65,6 +65,17 @@ evalTSp env = \case
   []      -> pure []
   sp :> a -> (:>) <$> evalTSp env sp <*> evalTy env a
 
+-- | Forcing of metavariables.
+--
+-- @since 1.0.0
+forceTy :: MonadMeta m => VTy -> m VTy
+forceTy = \case
+  va@(VMeta m sp) -> do (metaSt, _) <- lookupMeta m
+                        case metaSt of
+                          Solved a  -> forceTy =<< applyMeta a sp
+                          Unsolved  -> pure va
+  va              -> pure va
+
 -- | Convert de-Bruijn level to index.
 lvl2Ix :: Lvl -> Lvl -> Ix
 lvl2Ix (Lvl n) (Lvl l) = Ix (n - l - 1)
@@ -73,7 +84,7 @@ lvl2Ix (Lvl n) (Lvl l) = Ix (n - l - 1)
 --
 -- @since 1.0.0
 quoteTy :: MonadMeta m => Lvl -> VTy -> m Ty
-quoteTy n = \case
+quoteTy n va = forceTy va >>= \case
   VTyVar l    -> pure $ TyVar (lvl2Ix n l)
   VData l sp  -> Data l <$> quoteTSp n sp
   VMeta m sp  -> Meta m <$> quoteTSp n sp
@@ -95,18 +106,7 @@ quoteTSp n = \case
 --
 -- @since 1.0.0
 showVTy :: MonadMeta m => TyPCxt -> VTy -> m String
-showVTy cxt@(xs, _) va = showPretty cxt <$> quoteTy (Lvl $ length xs) va
-
--- | Forcing of metavariables.
---
--- @since 1.0.0
-forceTy :: MonadMeta m => VTy -> m VTy
-forceTy = \case
-  va@(VMeta m sp) -> do entry <- lookupMeta m
-                        case entry of
-                          Solved a  -> forceTy =<< applyMeta a sp
-                          Unsolved  -> pure va
-  va              -> pure va
+showVTy cxt@(xs, _, _) va = showPretty cxt <$> quoteTy (Lvl $ length xs) va
 
 ------------------------------------------------------------
 -- Terms
