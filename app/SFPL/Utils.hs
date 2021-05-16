@@ -11,6 +11,7 @@ module SFPL.Utils
     -- * Helper functions
     (<$$>),
     arr,
+    assocArr,
     bindM2,
     devError,
     hjoin,
@@ -58,8 +59,14 @@ type WithCS c = (HasCallStack, c)
 -- | Create an array from a list.
 --
 -- @since 1.0.0
-arr :: (IArray a e, Arr.Ix i, Num i, Enum i) => [e] -> a i e
-arr elems = array (0, fromIntegral $ length elems - 1) $ zip [0 ..] elems
+arr :: (IArray a e, Arr.Ix i, Num i) => [e] -> a i e
+arr elems = listArray (0, fromIntegral $ length elems - 1) elems
+
+-- | Create an array from a list of associations.
+--
+-- @since 1.0.0
+assocArr :: (IArray a e, Arr.Ix i, Num i) => [(i, e)] -> a i e
+assocArr assocs = array (0, fromIntegral $ length assocs - 1) assocs
 
 -- | Bind two values in a monad.
 --

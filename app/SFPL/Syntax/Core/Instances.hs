@@ -12,7 +12,7 @@ import SFPL.Syntax.Core.Pretty
 
 -- | @since 1.0.0
 instance Pretty TyPCxt Ty where
-  prettyPrec = prettyTy
+  prettyPrec = prettyTy True
 
 ----------------------------------------
 -- Patterns
@@ -46,11 +46,11 @@ deriving instance Bounded BinaryFunc -- ^ @since 1.0.0
 
 -- | @since 1.0.0
 instance Pretty TmPCxt Tm where
-  prettyPrec = prettyTm
+  prettyPrec = prettyTm True
 
 -- | @since 1.0.0
 instance Pretty TLPCxt TopLevelDef where
-  prettyPrec = prettyTopLevelDef
+  prettyPrec = prettyTopLevelDef True
 
 ----------------------------------------
 -- Type declarations
