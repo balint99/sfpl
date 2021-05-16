@@ -22,7 +22,9 @@ executable sfpl
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
-    other-modules: SFPL.Base, SFPL.Elab, SFPL.Elab.Metacontext, SFPL.Elab.Types,
+    other-modules: SFPL.Base, SFPL.Elab, SFPL.Elab.Class, SFPL.Elab.Context,
+                   SFPL.Elab.Error, SFPL.Elab.Error.Pretty, SFPL.Elab.Error.Types,
+                   SFPL.Elab.Internal, SFPL.Elab.Metacontext, SFPL.Elab.Unification,
                    SFPL.Eval, SFPL.Eval.Instances, SFPL.Eval.Internal, SFPL.Eval.Pretty,
                    SFPL.Eval.Types, SFPL.Parser, SFPL.Parser.Expr,
                    SFPL.Syntax.Core, SFPL.Syntax.Core.Instances, SFPL.Syntax.Core.Pretty,
