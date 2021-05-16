@@ -6,6 +6,10 @@ module SFPL.Syntax.Core
     Ty (..),
     TSpine,
     
+    -- * Patterns
+    CtrArgs,
+    Pattern (..),
+    
     -- * Terms
     UnaryOp (..),
     unOpDetails,
@@ -19,10 +23,12 @@ module SFPL.Syntax.Core
     binFuncName,
     CaseBranch,
     Tm (..),
+    TopLevelDef (..),
     
-    -- * Patterns
-    CtrArgs,
-    Pattern (..),
+    -- * Type declarations
+    Constructor (..),
+    DataDecl (..),
+    TypeDecl (..),
     
     -- * Printing
     TyPCxt,
@@ -42,6 +48,30 @@ module SFPL.Syntax.Core
     prettyTm,
     showTmPrec,
     showTm,
+    
+    TLPCxt,
+    tlPCxt,
+    prettyTopLevelDef,
+    showTopLevelDefPrec,
+    showTopLevelDef,
+    
+    CtrPCxt,
+    ctrPCxt,
+    prettyConstructor,
+    showConstructorPrec,
+    showConstructor,
+    
+    DDPCxt,
+    ddPCxt,
+    prettyDataDecl,
+    showDataDeclPrec,
+    showDataDecl,
+    
+    TDPCxt,
+    tdPCxt,
+    prettyTypeDecl,
+    showTypeDeclPrec,
+    showTypeDecl,
   )
   where
 

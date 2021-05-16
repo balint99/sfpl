@@ -39,6 +39,32 @@ data Ty
 --
 -- @since 1.0.0
 type TSpine = [Ty]
+
+------------------------------------------------------------
+-- Patterns
+
+-- | Arguments of a constructor pattern. An argument is either a field binding
+-- or an implicit type variable binding.
+--
+-- @since 1.0.0
+type CtrArgs = [Either Name TyName]
+
+-- | Patterns in a case expression.
+--
+-- @since 1.0.0
+data Pattern
+  = -- | An integer.
+    PInt Integer
+  | -- | A floating point number.
+    PFloat Double
+  | -- | A character.
+    PChar Char
+  | -- | A tuple (except 1-tuple).
+    PTuple [Name]
+  | -- | A data constructor.
+    PCtr Lvl CtrArgs
+  | -- | A wildcard.
+    PWildcard
   
 ------------------------------------------------------------
 -- Terms
@@ -210,28 +236,26 @@ data Tm
   | -- | Bind in the IO monad.
     Bind Name Ty Tm Tm
 
+-- | A top-level definition.
+--
+-- @since 1.0.0
+data TopLevelDef = TL Name Ty Tm
+
 ------------------------------------------------------------
--- Patterns
+-- Type declarations
 
--- | Arguments of a constructor pattern. An argument is either a field binding
--- or an implicit type variable binding.
+-- | Data constructor declaration. A constructor has an identifier and a type.
 --
 -- @since 1.0.0
-type CtrArgs = [Either Name TyName]
+data Constructor = Constructor Lvl Ty
 
--- | Patterns in a case expression.
+-- | Data type declaration, costisting of an identifier, a list of type parameter names
+-- and a list of constructors, both of which may be empty.
 --
 -- @since 1.0.0
-data Pattern
-  = -- | An integer.
-    PInt Integer
-  | -- | A floating point number.
-    PFloat Double
-  | -- | A character.
-    PChar Char
-  | -- | A tuple (except 1-tuple).
-    PTuple [Name]
-  | -- | A data constructor.
-    PCtr Lvl CtrArgs
-  | -- | A wildcard.
-    PWildcard
+data DataDecl = DD Lvl [TyName] [Constructor]
+
+-- | A type declaration. Currently only algebraic data types are supported.
+--
+-- @since 1.0.0
+data TypeDecl = DataDecl DataDecl

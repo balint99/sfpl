@@ -12,7 +12,6 @@ module SFPL.Base
     Ix (..),
     Lvl (..),
     Metavar (..),
-    Tag (..),
     
     -- * Data types
     Prec (..),
@@ -115,12 +114,13 @@ newtype Ix = Ix { unIx :: Int }
 -- @since 1.0.0
 newtype Lvl = Lvl { unLvl :: Int }
   deriving
-    ( Eq    -- ^ @since 1.0.0
-    , Ord   -- ^ @since 1.0.0
-    , Enum  -- ^ @since 1.0.0
-    , Show  -- ^ @since 1.0.0
-    , Num   -- ^ @since 1.0.0
-    , Ix.Ix -- ^ @since 1.0.0
+    ( Eq        -- ^ @since 1.0.0
+    , Ord       -- ^ @since 1.0.0
+    , Enum      -- ^ @since 1.0.0
+    , Show      -- ^ @since 1.0.0
+    , Num       -- ^ @since 1.0.0
+    , Ix.Ix     -- ^ @since 1.0.0
+    , Hashable  -- ^ @since 1.0.0
     ) via Int
 
 -- | Metavariables.
@@ -132,19 +132,6 @@ newtype Metavar = Metavar { unMetavar :: Int }
     , Show     -- ^ @since 1.0.0
     , Num      -- ^ @since 1.0.0
     , Hashable -- ^ @since 1.0.0
-    ) via Int
-
--- | Data constructor tag.
---
--- @since 1.0.0
-newtype Tag = Tag { unTag :: Int }
-  deriving
-    ( Eq    -- ^ @since 1.0.0
-    , Ord   -- ^ @since 1.0.0
-    , Enum  -- ^ @since 1.0.0
-    , Show  -- ^ @since 1.0.0
-    , Num   -- ^ @since 1.0.0
-    , Ix.Ix -- ^ @since 1.0.0
     ) via Int
 
 ------------------------------------------------------------

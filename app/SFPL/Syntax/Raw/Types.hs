@@ -361,16 +361,21 @@ data Constructor = Constructor Name Ty BegPos
 
 -- | Data type declaration, costisting of a type name, a list of type parameters
 -- and a list of constructors, both of which may be empty.
+--
+-- @since 1.0.0
 data DataDecl = DD TyName [TyName] [Constructor] BegPos EndPos
 
 -- | A type declaration. Currently only algebraic data types are supported.
+--
+-- @since 1.0.0
 data TypeDecl = DataDecl DataDecl
 
 ------------------------------------------------------------
 -- Programs
 
 -- | A program consists of a list of type declarations and top-level definitions.
--- An executable program must contain a top-level definition named @main@, with type 'World Unit'.
+-- An executable program must contain a top-level definition named @main@,
+-- with type @% a@ for some type @a@.
 --
 -- @since 1.0.0
 type Program = [Either TypeDecl TopLevelDef]

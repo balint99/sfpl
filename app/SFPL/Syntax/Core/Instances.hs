@@ -47,3 +47,22 @@ deriving instance Bounded BinaryFunc -- ^ @since 1.0.0
 -- | @since 1.0.0
 instance Pretty TmPCxt Tm where
   prettyPrec = prettyTm
+
+-- | @since 1.0.0
+instance Pretty TLPCxt TopLevelDef where
+  prettyPrec = prettyTopLevelDef
+
+----------------------------------------
+-- Type declarations
+
+-- | @since 1.0.0
+instance Pretty CtrPCxt Constructor where
+  prettyPrec = prettyConstructor
+
+-- | @since 1.0.0
+instance Pretty DDPCxt DataDecl where
+  prettyPrec = prettyDataDecl
+
+-- | @since 1.0.0
+instance Pretty TDPCxt TypeDecl where
+  prettyPrec = prettyTypeDecl

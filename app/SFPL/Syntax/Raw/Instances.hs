@@ -129,9 +129,8 @@ instance Pretty' Tm where
   prettyPrec' = prettyTm
 
 -- | @since 1.0.0
-{-instance Show Tm where
-  showsPrec p t = showString $ showPrettyPrec' (intToPrec p) t-}
-deriving instance Show Tm
+instance Show Tm where
+  showsPrec p t = showString $ showPrettyPrec' (intToPrec p) t
 
 topLevelDefSpan :: TopLevelDef -> Span
 topLevelDefSpan (TL _ _ _ beg end) = (beg, end)

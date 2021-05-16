@@ -10,6 +10,7 @@ import Control.Monad.State
 import Data.Array.IArray hiding (Ix)
 import qualified Data.Array.IArray as Arr (Ix)
 import Data.Char (showLitChar)
+import Data.List (foldl')
 import SFPL.Base
 import SFPL.Syntax.Core.Types
 import qualified SFPL.Syntax.Raw.Pretty as Raw (prettyCtrPat)
@@ -20,19 +21,19 @@ import Text.PrettyPrint
 -- Printing types
 
 -- | Information context for printing types: The names of bound type variables
--- and the names of defined data types.
+-- and the names of defined types.
 --
 -- @since 1.0.0
 type TyPCxt = ([TyName], Array Lvl TyName)
 
--- | Create an information context for types from the given list of data type names.
+-- | Create an information context for types from the given list of type names.
 --
 -- @since 1.0.0
 tyPCxt :: [TyName] -> TyPCxt
-tyPCxt ds = ([], arr ds)
+tyPCxt ts = ([], arr ts)
 
 tyBind :: TyName -> TyPCxt -> TyPCxt
-tyBind x (xs, ds) = (xs :> x, ds)
+tyBind x (xs, ts) = (xs :> x, ts)
 
 prettyData :: Prec -> TyPCxt -> TyName -> TSpine -> Doc
 prettyData p cxt x = \case
@@ -62,9 +63,9 @@ prettyForAll cxt = \case
 --
 -- @since 1.0.0
 prettyTy :: Prec -> TyPCxt -> Ty -> Doc
-prettyTy p cxt@(xs, ds) = \case
+prettyTy p cxt@(xs, ts) = \case
   TyVar i     -> text $ xs !! unIx i
-  Data l sp   -> prettyData p cxt (ds ! l) sp
+  Data l sp   -> prettyData p cxt (ts ! l) sp
   Meta m sp   -> prettyMeta p cxt m sp
   FreshMeta m -> prettyFreshMeta p xs m
   Int         -> text kwInt
@@ -135,20 +136,18 @@ showPat = showPatPrec LowP
 -- Printing terms
 
 -- | Information context for printing terms: the names of bound variables,
--- top-level definitions, bound type variables, defined data types and their constructors.
+-- top-level definitions, bound type variables, defined types and
+-- data constructors.
 --
 -- @since 1.0.0
 type TmPCxt = ([Name], Array Lvl Name, TyPCxt, PatPCxt)
 
 -- | Create an information context for terms from the given information:
--- names of top-level definitions, data types and their constructors.
+-- names of top-level definitions, defined types and data constructors.
 --
 -- @since 1.0.0
-tmPCxt :: [Name] -> [(TyName, [Name])] -> TmPCxt
-tmPCxt tls dcs = ([], arr tls, tyPCxt ds, patPCxt cs)
-  where
-    (ds, cs') = unzip dcs
-    cs = concat cs'
+tmPCxt :: [Name] -> [TyName] -> [Name] -> TmPCxt
+tmPCxt tls ts cs = ([], arr tls, tyPCxt ts, patPCxt cs)
 
 tmBind :: Name -> TmPCxt -> TmPCxt
 tmBind x (xs, tls, tcxt, pcxt) = (xs :> x, tls, tcxt, pcxt)
@@ -305,3 +304,155 @@ showTmPrec p cxt t = render $ prettyTm p cxt t
 -- @since 1.0.0
 showTm :: TmPCxt -> Tm -> String
 showTm = showTmPrec LowP
+
+-- | Information context for printing top-level definitions:
+-- the names of all top-level definitions, defined types and
+-- data constructors.
+--
+-- @since 1.0.0
+type TLPCxt = (Array Lvl Name, Array Lvl TyName, Array Lvl Name)
+
+-- | Create an information context for top-level definitions from the given information:
+-- names of top-level definitions, defined types and data constructors.
+--
+-- @since 1.0.0
+tlPCxt :: [Name] -> [TyName] -> [Name] -> TLPCxt
+tlPCxt tls ts cs = (arr tls, arr ts, arr cs)
+
+-- | Pretty-print a top-level definition.
+--
+-- @since 1.0.0
+prettyTopLevelDef :: Prec -> TLPCxt -> TopLevelDef -> Doc
+prettyTopLevelDef p cxt@(tls, ts, cs) (TL x a t) =
+  par p LowP $ prettyTySig tyCxt x a
+            $$ nest 2 (char '=' <+> prettyTm LowP tmCxt t) <> char ';'
+  where
+    tyCxt = ([], ts)
+    tmCxt = ([], tls, tyCxt, cs)
+
+-- | Convert a top-level definition to a pretty string,
+-- using the given information context.
+--
+-- @since 1.0.0
+showTopLevelDefPrec :: Prec -> TLPCxt -> TopLevelDef -> String
+showTopLevelDefPrec p cxt tl = render $ prettyTopLevelDef p cxt tl
+
+-- | Same as 'showTopLevelDefPrec LowP'.
+--
+-- @since 1.0.0
+showTopLevelDef :: TLPCxt -> TopLevelDef -> String
+showTopLevelDef = showTopLevelDefPrec LowP
+
+----------------------------------------
+-- Printing type declarations
+
+-- | Information context for printing data constructor declarations:
+-- the names of bound type variables, defined types and data constructors.
+--
+-- @since 1.0.0
+type CtrPCxt = (TyPCxt, Array Lvl Name)
+
+-- | Create an information context for data constructor declarations
+-- from the given information: the type variables bound by the owning
+-- data type, the names of defined types and data constructors.
+--
+-- @since 1.0.0
+ctrPCxt :: [TyName] -> [TyName] -> [Name] -> CtrPCxt
+ctrPCxt xs ts cs = (tcxt, arr cs)
+  where
+    tcxt = (reverse xs, arr ts)
+
+-- | Pretty-print a data constructor declaration.
+--
+-- @since 1.0.0
+prettyConstructor :: Prec -> CtrPCxt -> Constructor -> Doc
+prettyConstructor p cxt@(tcxt, cs) (Constructor l a) =
+  par p LowP $ prettyTySig tcxt (cs ! l) a
+
+-- | Convert a data constructor declaration to a pretty string,
+-- using the given information context.
+--
+-- @since 1.0.0
+showConstructorPrec :: Prec -> CtrPCxt -> Constructor -> String
+showConstructorPrec p cxt c = render $ prettyConstructor p cxt c
+
+-- | Same as 'showConstructorPrec LowP'.
+--
+-- @since 1.0.0
+showConstructor :: CtrPCxt -> Constructor -> String
+showConstructor = showConstructorPrec LowP
+
+-- | Information context for printing data type declarations:
+-- the names of defined types and data constructors.
+--
+-- @since 1.0.0
+type DDPCxt = (Array Lvl TyName, Array Lvl Name)
+
+-- | Create an information context for data type declarations
+-- from the given information: names of defined types and data constructors.
+--
+-- @since 1.0.0
+ddPCxt :: [TyName] -> [Name] -> DDPCxt
+ddPCxt ts cs = (arr ts, arr cs)
+
+prettyConstructors :: CtrPCxt -> [Constructor] -> Doc
+prettyConstructors ccxt = \case
+  []      -> empty
+  c : cs  -> space <> (char '=' <+> prettyConstructor LowP ccxt c
+                    $$ vcat (map (\c -> char '|' <+> prettyConstructor LowP ccxt c) cs))
+
+-- | Pretty-print a data type declaration.
+--
+-- @since 1.0.0
+prettyDataDecl :: Prec -> DDPCxt -> DataDecl -> Doc
+prettyDataDecl p cxt@(ts, cs) (DD l xs cs') =
+  par p LowP $ text "data" <+> text (ts ! l) <+> hsep (map text xs)
+            <> prettyConstructors ccxt cs' <> char ';'
+  where
+    ccxt = ((reverse xs, ts), cs)
+
+-- | Convert a data type declaration to a pretty string,
+-- using the given information context.
+--
+-- @since 1.0.0
+showDataDeclPrec :: Prec -> DDPCxt -> DataDecl -> String
+showDataDeclPrec p cxt dd = render $ prettyDataDecl p cxt dd
+
+-- | Same as 'showDataDeclPrec LowP'.
+--
+-- @since 1.0.0
+showDataDecl :: DDPCxt -> DataDecl -> String
+showDataDecl = showDataDeclPrec LowP
+
+-- | Information context for printing type declarations:
+-- the names of defined types and data constructors.
+--
+-- @since 1.0.0
+type TDPCxt = DDPCxt
+
+-- | Create an information context for type declarations
+-- from the given information: names of defined types and data constructors.
+--
+-- @since 1.0.0
+tdPCxt :: [TyName] -> [Name] -> TDPCxt
+tdPCxt = ddPCxt
+
+-- | Pretty-print a type declaration.
+--
+-- @since 1.0.0
+prettyTypeDecl :: Prec -> TDPCxt -> TypeDecl -> Doc
+prettyTypeDecl p cxt = \case
+  DataDecl dd -> prettyDataDecl p cxt dd
+
+-- | Convert a type declaration to a pretty string,
+-- using the given information context.
+--
+-- @since 1.0.0
+showTypeDeclPrec :: Prec -> TDPCxt -> TypeDecl -> String
+showTypeDeclPrec p cxt td = render $ prettyTypeDecl p cxt td
+
+-- | Same as 'showTypeDeclPrec LowP'.
+--
+-- @since 1.0.0
+showTypeDecl :: TDPCxt -> TypeDecl -> String
+showTypeDecl = showTypeDeclPrec LowP

@@ -227,6 +227,9 @@ prettyTopLevelDef p (TL x a t _ _) =
 ----------------------------------------
 -- Printing type declarations
 
+-- | Pretty-print a data constructor declaration.
+--
+-- @since 1.0.0
 prettyConstructor :: Prec -> Constructor -> Doc
 prettyConstructor p (Constructor x a _) = par p LowP $ prettyTySig x a
 
@@ -254,6 +257,9 @@ prettyTypeDecl p = \case
 ------------------------------------------------------------
 -- Printing programs
 
+-- | Pretty-print a program.
+--
+-- @since 1.0.0
 prettyProgram :: Prec -> Program -> Doc
 prettyProgram p = par p LowP . vcat
                 . map (endDef . either (prettyTypeDecl LowP) (prettyTopLevelDef LowP))
