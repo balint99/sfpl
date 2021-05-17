@@ -152,7 +152,7 @@ class Monad m => MonadRun m where
   getEvalCxt :: m EvalCxt
   
   -- | Throw an evaluation error.
-  throwErr :: EvalError -> m a
+  throwEvalError :: EvalError -> m a
   
   -- | Read a character from standard input.
   -- If end of input has been reached, should return 'Nothing'.

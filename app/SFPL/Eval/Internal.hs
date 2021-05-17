@@ -286,7 +286,7 @@ liftPure :: MonadRun m => EvalP a -> m a
 liftPure p = do
   cxt <- getEvalCxt
   case runReaderT p cxt of
-    Left e  -> throwErr e
+    Left e  -> throwEvalError e
     Right a -> pure a
 
 valToStringP :: MonadRun m => Val -> m String
@@ -300,7 +300,7 @@ devRunError :: MonadRun m => String -> [Val] -> m a
 devRunError s = liftPure . devEvalError s
 
 returnChar :: MonadRun m => Maybe Char -> m Val
-returnChar = maybe (throwErr "reached end of input") (pure . VChar)
+returnChar = maybe (throwEvalError "reached end of input") (pure . VChar)
 
 forcePutc :: MonadRun m => Env -> Tm -> m Val
 forcePutc env t = do

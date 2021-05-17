@@ -42,7 +42,7 @@ type Eval = ReaderT EvalCxt IO
 instance MonadRun Eval where
   getEvalCxt = ask
   
-  throwErr = error
+  throwEvalError = error
   
   readChar = do
     b <- liftIO isEOF

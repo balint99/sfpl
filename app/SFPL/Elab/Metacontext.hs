@@ -1,25 +1,30 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleContexts #-}
 
 -- | Types and functions corresponding to the metacontext of elaboration.
 module SFPL.Elab.Metacontext
-  ( MetaState (..),
+  ( -- * Types
+    MetaState (..),
     MetaInfo (..),
     MetaEntry,
+    SomeMetas (..),
+    
+    -- * Classes
+    Metas (..),
     MonadMeta (..),
-    Metacxt (..),
-    freshMetaDefault,
-    lookupMetaDefault,
-    updateMetaDefault,
   )
   where
 
 import Control.Monad.State
+import Data.Array.IArray (IArray)
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as M
 import GHC.Stack
 import SFPL.Base
 import SFPL.Syntax.Core.Types
 import SFPL.Utils
+
+------------------------------------------------------------
+-- Types
 
 -- | The state of a metavariable.
 --
@@ -45,6 +50,26 @@ data MetaInfo = MetaInfo
 -- @since 1.0.0
 type MetaEntry = (MetaState, MetaInfo)
 
+-- | Abstract type for metavariable mappings.
+--
+-- @since 1.0.0
+data SomeMetas = forall ms. Metas ms => SomeMetas ms
+
+------------------------------------------------------------
+-- Classes
+
+-- | A type class describing metavariable mappings. It is useful for
+-- taking a snapshot of the current metavariables and then
+-- accessing the information about them efficiently.
+--
+-- @since 1.0.0
+class Metas ms where
+  -- | Lookup a metavariable.
+  getMeta :: Metavar -> ms -> MetaEntry
+  
+  -- | Transform the mappings to an immutable array.
+  toArray :: IArray a e => (MetaEntry -> e) -> ms -> a Metavar e
+
 -- | Type class for monads with a metacontext.
 --
 -- @since 1.0.0
@@ -59,7 +84,10 @@ class Monad m => MonadMeta m where
   -- | Update a metavariable with a solution.
   -- Precondition: the metavariable exists.
   updateMeta :: HasCallStack => Metavar -> Ty -> m ()
-
+  
+  -- | Get the current metavariable mappings.
+  getMetas :: m SomeMetas
+{-
 -- | The metacontext.
 --
 -- @since 1.0.0
@@ -98,3 +126,4 @@ updateMetaDefault m a = do
     putSolution sol mcxt = mcxt {entries = M.adjust f m $ entries mcxt}
       where
         f (_, info) = (sol, info)
+-}

@@ -7,12 +7,21 @@ import SFPL.Elab.Context
 import SFPL.Elab.Metacontext
 import SFPL.Syntax.Raw.Types
 
--- | Any kind of elaboration error, which includes the state of the elaboration
--- context and metacontext when the error happened, the precise span where the error occurred,
--- as well as optional additional error items providing details about the error.
+-- | Any kind of elaboration error.
 --
 -- @since 1.0.0
-data ElabError = ElabError ElabCxt Metacxt Span ElabErrorType [ElabErrorItem]
+data ElabError = ElabError
+  { -- | State of elaboration context at the point when the error occured.
+    elabErrorCxt :: ElabCxt
+  , -- | State of metacontext at the point when the error occured.
+    elabErrorMetas :: SomeMetas
+  , -- | The precise span in the source where the error occured.
+    elabErrorSpan :: Span
+  , -- | The type of the error, which includes further details.
+    elabErrorType :: ElabErrorType
+  , -- | Optional additional error items providing details about the error.
+    elabErrorItems :: [ElabErrorItem]
+  }
 
 -- | The type of an elaboration error with further details.
 --
@@ -26,9 +35,9 @@ data ElabErrorType
     MultipleDeclarationsError Name BegPos
   | -- | A unification error. Includes the expected and inferred types.
     UnificationError Ty Ty
-  | -- | A metavariable is ambiguous.
+  {-| -- | A metavariable is ambiguous.
     -- Includes the identifier of the metavariable.
-    AmbiguousMeta Metavar
+    AmbiguousMeta Metavar-}
   | -- | An overloaded operator or built-in function is ambiguous.
     -- Includes the type of the overloaded symbol.
     AmbiguousOverloading OverloadType
@@ -36,7 +45,7 @@ data ElabErrorType
     -- Includes the expected type of the hole.
     HoleError Ty
 
--- | The types of syntactic elements which can generate an error.
+-- | The types of syntactic elements which can generate a scope error.
 --
 -- @since 1.0.0
 data SyntacticCategory
@@ -47,7 +56,7 @@ data SyntacticCategory
   | -- | A data constructor.
     SCConstructor
 
--- | The type and name of an overloaded entity.
+-- | The type of an overloaded entity.
 --
 -- @since 1.0.0
 data OverloadType
