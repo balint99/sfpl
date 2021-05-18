@@ -76,10 +76,6 @@ forceTy = \case
                           Unsolved  -> pure va
   va              -> pure va
 
--- | Convert de-Bruijn level to index.
-lvl2Ix :: Lvl -> Lvl -> Ix
-lvl2Ix (Lvl n) (Lvl l) = Ix (n - l - 1)
-
 -- | Quote a type value.
 --
 -- @since 1.0.0
@@ -271,6 +267,7 @@ eval env = \case
   BinFunc f t u -> evalBinFunc env f t u
   Case t bs     -> eval env t >>= \vt -> caseSplit env vt bs
   Bind x a t u  -> pure . VIO $ VBind env t u
+  Hole          -> devError "tried to evaluate hole"
 
 ----------------------------------------
 -- Effects

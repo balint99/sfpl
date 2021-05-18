@@ -8,7 +8,6 @@ import Prelude hiding ((<>))
 import Control.Arrow (first, second)
 import Control.Monad.State
 import Data.Array.IArray hiding (Ix)
-import qualified Data.Array.IArray as Arr (Ix)
 import Data.Char (showLitChar)
 import Data.List (foldl')
 import SFPL.Base
@@ -121,18 +120,6 @@ prettyPat p cxt = \case
   PTuple xs -> parens . hjoin ", " $ map text xs
   PCtr l bs -> prettyCtr p (cxt ! l) bs
   PWildcard -> text "_"
-
--- | Convert a pattern to a pretty string, using the given information context.
---
--- @since 1.0.0
-showPatPrec :: Prec -> PatPCxt -> Pattern -> String
-showPatPrec p cxt pat = render $ prettyPat p cxt pat
-
--- | Same as 'showPatPrec LowP'.
---
--- @since 1.0.0
-showPat :: PatPCxt -> Pattern -> String
-showPat = showPatPrec LowP
 
 ----------------------------------------
 -- Printing terms
@@ -297,6 +284,7 @@ prettyTm o p cxt@(xs, tls, tcxt, pcxt) = \case
   BinFunc f t u -> prettyKwApp o p cxt (binFuncName f) [t, u]
   Case t bs     -> par p BlockP $ prettyCase o cxt t bs
   Bind x a t u  -> par p LowP $ prettyBind o cxt x a t u
+  Hole          -> char '_'
 
 -- | Convert a term to a pretty string, using the given information context.
 --
@@ -376,19 +364,6 @@ prettyConstructor p cxt@(xs, ts, cs) (Constructor l a) =
   where
     tcxt = (xs, assocArr [], ts)
 
--- | Convert a data constructor declaration to a pretty string,
--- using the given information context.
---
--- @since 1.0.0
-showConstructorPrec :: Prec -> CtrPCxt -> Constructor -> String
-showConstructorPrec p cxt c = render $ prettyConstructor p cxt c
-
--- | Same as 'showConstructorPrec LowP'.
---
--- @since 1.0.0
-showConstructor :: CtrPCxt -> Constructor -> String
-showConstructor = showConstructorPrec LowP
-
 -- | Information context for printing data type declarations:
 -- the names of defined types and data constructors.
 --
@@ -418,19 +393,6 @@ prettyDataDecl p cxt@(ts, cs) (DD l xs cs') =
   where
     ccxt = (reverse xs, ts, cs)
 
--- | Convert a data type declaration to a pretty string,
--- using the given information context.
---
--- @since 1.0.0
-showDataDeclPrec :: Prec -> DDPCxt -> DataDecl -> String
-showDataDeclPrec p cxt dd = render $ prettyDataDecl p cxt dd
-
--- | Same as 'showDataDeclPrec LowP'.
---
--- @since 1.0.0
-showDataDecl :: DDPCxt -> DataDecl -> String
-showDataDecl = showDataDeclPrec LowP
-
 -- | Information context for printing type declarations:
 -- the names of defined types and data constructors.
 --
@@ -451,15 +413,46 @@ prettyTypeDecl :: Prec -> TDPCxt -> TypeDecl -> Doc
 prettyTypeDecl p cxt = \case
   DataDecl dd -> prettyDataDecl p cxt dd
 
--- | Convert a type declaration to a pretty string,
+------------------------------------------------------------
+-- Printing programs
+
+-- | Information context for printing programs:
+-- the names of all top-level definitions, metavariables, defined types and
+-- data constructors.
+--
+-- @since 1.0.0
+type ProgPCxt = TLPCxt
+
+-- | Create an information context for programs from the given information:
+-- names of top-level definitions, metavariables, defined types and data constructors.
+--
+-- @since 1.0.0
+progPCxt :: [Name] -> [(Metavar, TyName)] -> [TyName] -> [Name] -> ProgPCxt
+progPCxt = tlPCxt
+
+-- | Pretty-print a program. The first parameter tells
+-- whether metavariables should be printed by name or as a
+-- top-level function applied to its spine.
+--
+-- @since 1.0.0
+prettyProgram :: Bool -> Prec -> ProgPCxt -> Program -> Doc
+prettyProgram o p cxt@(tls, ms, ts, cs) =
+  par p LowP . vcat
+  . map (endDef . either (prettyTypeDecl p tdcxt) (prettyTopLevelDef o p tlcxt))
+  where
+    endDef doc = doc $$ text ""
+    tdcxt = (ts, cs)
+    tlcxt = cxt
+
+-- | Convert a program to a pretty string,
 -- using the given information context.
 --
 -- @since 1.0.0
-showTypeDeclPrec :: Prec -> TDPCxt -> TypeDecl -> String
-showTypeDeclPrec p cxt td = render $ prettyTypeDecl p cxt td
+showProgramPrec :: Bool -> Prec -> ProgPCxt -> Program -> String
+showProgramPrec o p cxt pr = render $ prettyProgram o p cxt pr
 
--- | Same as 'showTypeDeclPrec LowP'.
+-- | Same as 'showProgramPrec', with the lowest precedence.
 --
 -- @since 1.0.0
-showTypeDecl :: TDPCxt -> TypeDecl -> String
-showTypeDecl = showTypeDeclPrec LowP
+showProgram :: Bool -> ProgPCxt -> Program -> String
+showProgram o = showProgramPrec o LowP

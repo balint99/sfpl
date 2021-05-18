@@ -16,6 +16,7 @@ module SFPL.Utils
     devError,
     hjoin,
     par,
+    pair,
     vjoin,
   )
   where
@@ -97,6 +98,12 @@ hjoin sep = hcat . punctuate (text sep)
 par :: Prec -> Prec -> Doc -> Doc
 par p p' doc | p > p'    = parens doc
              | otherwise = doc
+
+-- | Pair two values in an applicative context.
+--
+-- @since 1.0.0
+pair :: Applicative f => f a -> f b -> f (a, b)
+pair fa fb = (,) <$> fa <*> fb
 
 -- | Join a list of documents using the given separator, starting each document on a new line.
 --

@@ -30,6 +30,9 @@ module SFPL.Syntax.Core
     DataDecl (..),
     TypeDecl (..),
     
+    -- * Programs
+    Program,
+    
     -- * Printing
     TyPCxt,
     tyPCxt,
@@ -40,8 +43,6 @@ module SFPL.Syntax.Core
     PatPCxt,
     patPCxt,
     prettyPat,
-    showPatPrec,
-    showPat,
     
     TmPCxt,
     tmPCxt,
@@ -58,20 +59,20 @@ module SFPL.Syntax.Core
     CtrPCxt,
     ctrPCxt,
     prettyConstructor,
-    showConstructorPrec,
-    showConstructor,
     
     DDPCxt,
     ddPCxt,
     prettyDataDecl,
-    showDataDeclPrec,
-    showDataDecl,
     
     TDPCxt,
     tdPCxt,
     prettyTypeDecl,
-    showTypeDeclPrec,
-    showTypeDecl,
+    
+    ProgPCxt,
+    progPCxt,
+    prettyProgram,
+    showProgramPrec,
+    showProgram,
   )
   where
 

@@ -5,7 +5,8 @@ module SFPL.Elab.Error.Types where
 import SFPL.Base
 import SFPL.Elab.Context
 import SFPL.Elab.Metacontext
-import SFPL.Syntax.Raw.Types
+import SFPL.Syntax.Core.Types
+import SFPL.Syntax.Raw.Types (BegPos, Span)
 
 -- | Any kind of elaboration error.
 --
@@ -34,7 +35,7 @@ data ElabErrorType
     -- Includes the name, and the source position of the previous declaration.
     MultipleDeclarationsError Name BegPos
   | -- | A unification error. Includes the expected and inferred types.
-    UnificationError Ty Ty
+    UnificationError Ty Ty UnificationErrorReason
   {-| -- | A metavariable is ambiguous.
     -- Includes the identifier of the metavariable.
     AmbiguousMeta Metavar-}
@@ -55,6 +56,19 @@ data SyntacticCategory
     SCVariable
   | -- | A data constructor.
     SCConstructor
+
+-- | The reason why a unification failed.
+--
+-- @since 1.0.0
+data UnificationErrorReason
+  = -- | There was a rigid mismatch between constructors.
+    RigidMismatch
+  | -- | The spine did not consist of distinct bound variables.
+    InvalidSpine
+  | -- | The right hand contained a free variable not contained in the spine.
+    EscapingVariable Lvl
+  | -- | The metavariable solved for occurred recursively in the equation.
+    Occurs Metavar
 
 -- | The type of an overloaded entity.
 --
