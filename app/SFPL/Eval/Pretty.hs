@@ -61,15 +61,3 @@ prettyVal p ctrs = \case
   VTuple vts  -> parens . hjoin ", " $ map (prettyVal LowP ctrs) vts
   VCtr l sp   -> prettyVCtr p ctrs (ctrs ! l) sp
   VIO{}       -> text "<io action>"
-
--- | Convert a term value to a pretty string.
---
--- @since 1.0.0
-showValPrec :: Prec -> CtrNames -> Val -> String
-showValPrec p ctrs vt = render $ prettyVal p ctrs vt
-
--- | Same as 'showValPrec LowP'.
---
--- @since 1.0.0
-showVal :: CtrNames -> Val -> String
-showVal = showValPrec LowP

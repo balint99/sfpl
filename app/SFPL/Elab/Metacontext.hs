@@ -7,6 +7,8 @@ module SFPL.Elab.Metacontext
     MetaInfo (..),
     MetaEntry,
     SomeMetas (..),
+    getMeta,
+    toAssocList,
     
     -- * Classes
     Metas (..),
@@ -15,7 +17,6 @@ module SFPL.Elab.Metacontext
   where
 
 import Control.Monad.State
-import Data.Array.IArray (IArray)
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as M
 import GHC.Stack
@@ -55,6 +56,17 @@ type MetaEntry = (MetaState, MetaInfo)
 -- @since 1.0.0
 data SomeMetas = forall ms. Metas ms => SomeMetas ms
 
+-- | Lookup a metavariable.
+--
+-- @since 1.0.0
+getMeta :: Metavar -> SomeMetas -> MetaEntry
+getMeta m (SomeMetas metas) = metasGet m metas
+
+-- | Transform the mappings to an association list,
+-- applying the given function to the entries.
+toAssocList :: (MetaEntry -> e) -> SomeMetas -> [(Metavar, e)]
+toAssocList f (SomeMetas metas) = metasToAssocList f metas
+
 ------------------------------------------------------------
 -- Classes
 
@@ -65,10 +77,11 @@ data SomeMetas = forall ms. Metas ms => SomeMetas ms
 -- @since 1.0.0
 class Metas ms where
   -- | Lookup a metavariable.
-  getMeta :: Metavar -> ms -> MetaEntry
+  metasGet :: Metavar -> ms -> MetaEntry
   
-  -- | Transform the mappings to an immutable array.
-  toArray :: IArray a e => (MetaEntry -> e) -> ms -> a Metavar e
+  -- | Transform the mappings to an association list,
+  -- applying the given function to the entries.
+  metasToAssocList :: (MetaEntry -> e) -> ms -> [(Metavar, e)]
 
 -- | Type class for monads with a metacontext.
 --
@@ -87,43 +100,3 @@ class Monad m => MonadMeta m where
   
   -- | Get the current metavariable mappings.
   getMetas :: m SomeMetas
-{-
--- | The metacontext.
---
--- @since 1.0.0
-data Metacxt = Metacxt
-  { -- | The current metavariables.
-    entries :: HashMap Metavar MetaEntry
-  , -- | The ordinal of the next metavariable.
-    nextMeta :: Metavar
-  }
-
--- Default methods
-freshMetaDefault :: MonadState Metacxt m => MetaInfo -> m Ty
-freshMetaDefault info = do
-  mcxt <- get
-  let m = nextMeta mcxt
-      newEntries = M.insert m (Unsolved, info) $ entries mcxt
-  put $ Metacxt newEntries (m + 1)
-  pure $ FreshMeta m
-
-lookupMetaDefault :: WithCS (MonadState Metacxt m) =>
-  Metavar -> m MetaEntry
-lookupMetaDefault m = do
-  mcxt <- get
-  case M.lookup m (entries mcxt) of
-    Just entry  -> pure entry
-    Nothing     -> devError $ "metavariable not in scope: " ++ show m
-
-updateMetaDefault :: WithCS (MonadState Metacxt m) =>
-  Metavar -> Ty -> m ()
-updateMetaDefault m a = do
-  mcxt <- get
-  if M.member m (entries mcxt)
-    then modify (putSolution $ Solved a)
-    else devError $ "metavariable not in scope: " ++ show m
-  where
-    putSolution sol mcxt = mcxt {entries = M.adjust f m $ entries mcxt}
-      where
-        f (_, info) = (sol, info)
--}

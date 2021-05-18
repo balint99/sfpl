@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 
 -- | The context of elaboration.
 module SFPL.Elab.Context where
@@ -8,29 +9,16 @@ import SFPL.Eval.Types
 import SFPL.Syntax.Core.Types
 import SFPL.Syntax.Raw.Types (BegPos)
 
--- | Type describing the types of program elements:
--- type declarations and top-level definitions.
---
--- @since 1.0.0
-data ElemType = ETypeDecl | ETopLevelDef
-
 -- | The top-level context at a given point of elaboration.
 --
 -- @since 1.0.0
 data TopLevelCxt = TopLevelCxt
-  { -- | The type declarations in scope.
-    typeDecls :: [TypeDecl]
-  , -- | The top-level definitions in scope.
-    topLevelDefs :: [TopLevelDef]
-  , -- | The identifier for the next type declaration.
+  { -- | The identifier for the next type declaration.
     nextTypeDecl :: Lvl
   , -- | The identifier for the next data constructor.
     nextConstructor :: Lvl
   , -- | The identifier for the next top-level definition.
     nextTopLevelDef :: Lvl
-  , -- | A list describing the order of type declarations and
-    -- top-level definitions as they appeared in the source file.
-    order :: [ElemType]
   }
 
 -- | Namespaces, mapping names to their properties needed for elaboration.
@@ -69,13 +57,26 @@ data TmEntry
     -- and its type.
     VarEntry Lvl Ty
 
--- | The printing context, containing information needed for
--- pretty-printing types and identifiers.
+tmEntryType :: TmEntry -> Ty
+tmEntryType = \case
+  TopLevelEntry _ a _     -> a
+  ConstructorEntry _ a _  -> a
+  VarEntry _ a            -> a
+
+-- | The printing context, containing information needed for pretty-printing.
+--
+-- @since 1.0.0
 data PrintCxt = PrintCxt
   { -- | Names of bound type variables.
     tyVars :: [TyName]
+  , -- | Names of defined types.
+    typeNames :: [TyName]
+  , -- | Names of defined data constructors.
+    constructorNames :: [Name]
   , -- | Names of bound term variables.
     tmVars :: [Name]
+  , -- | Names of top-level definitions.
+    topLevelDefNames :: [Name]
   }
 
 -- | The elaboration context. Contains all global and local information

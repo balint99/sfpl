@@ -11,6 +11,7 @@ module SFPL.Base
     -- * Newtypes
     Ix (..),
     Lvl (..),
+    lvl2Ix,
     Metavar (..),
     
     -- * Data types
@@ -122,6 +123,12 @@ newtype Lvl = Lvl { unLvl :: Int }
     , Ix.Ix     -- ^ @since 1.0.0
     , Hashable  -- ^ @since 1.0.0
     ) via Int
+
+-- | Convert de-Bruijn level to index.
+--
+-- @since 1.0.0
+lvl2Ix :: Lvl -> Lvl -> Ix
+lvl2Ix (Lvl n) (Lvl l) = Ix (n - l - 1)
 
 -- | Metavariables.
 --

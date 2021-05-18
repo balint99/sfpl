@@ -235,6 +235,8 @@ data Tm
     Case Tm [CaseBranch]
   | -- | Bind in the IO monad.
     Bind Name Ty Tm Tm
+  | -- | A hole. The evaluation of a hole raises an error.
+    Hole
 
 -- | A top-level definition.
 --
@@ -259,3 +261,13 @@ data DataDecl = DD Lvl [TyName] [Constructor]
 --
 -- @since 1.0.0
 data TypeDecl = DataDecl DataDecl
+
+------------------------------------------------------------
+-- Programs
+
+-- | A program consists of a list of type declarations and top-level definitions.
+-- An executable program must contain a top-level definition named @main@,
+-- with type @% a@ for some type @a@.
+--
+-- @since 1.0.0
+type Program = [Either TypeDecl TopLevelDef]

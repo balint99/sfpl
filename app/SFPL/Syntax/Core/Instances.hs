@@ -66,3 +66,10 @@ instance Pretty DDPCxt DataDecl where
 -- | @since 1.0.0
 instance Pretty TDPCxt TypeDecl where
   prettyPrec = prettyTypeDecl
+
+----------------------------------------
+-- Programs
+
+-- | @since 1.0.0
+instance Pretty ProgPCxt Program where
+  prettyPrec = prettyProgram True
