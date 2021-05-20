@@ -64,6 +64,8 @@ getMeta m (SomeMetas metas) = metasGet m metas
 
 -- | Transform the mappings to an association list,
 -- applying the given function to the entries.
+--
+-- @since 1.0.0
 toAssocList :: (MetaEntry -> e) -> SomeMetas -> [(Metavar, e)]
 toAssocList f (SomeMetas metas) = metasToAssocList f metas
 

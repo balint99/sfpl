@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, LambdaCase #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, LambdaCase, RecordWildCards #-}
 -- | Elaboration.
 module SFPL.Elab
   ( module SFPL.Elab,
@@ -12,93 +12,205 @@ import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as M
 import Control.Monad.State
 import Control.Monad.Except
+import Control.Monad.Reader
 import SFPL.Base
 import SFPL.Utils
+import SFPL.Parser
+import SFPL.Elab.Context
 import SFPL.Elab.Metacontext
 import SFPL.Syntax.Core
+import SFPL.Syntax.Core.Pretty
+import qualified SFPL.Syntax.Raw as R
 import SFPL.Elab.Error
 import SFPL.Elab.Class
 import SFPL.Elab.Unification
+import SFPL.Elab.Internal
 import SFPL.Eval.Types
+import qualified SFPL.Eval as E
 import Text.PrettyPrint
 import Prelude hiding ((<>))
+import Text.Megaparsec hiding (State)
+import Text.PrettyPrint
+import Data.Void
 
--- | The metacontext.
---
--- @since 1.0.0
-data Metacxt = Metacxt
+data ElabSt = ElabSt
   { -- | The current metavariables.
-    entries :: HashMap Metavar MetaEntry
+    metaEntries :: HashMap Metavar MetaEntry
   , -- | The ordinal of the next metavariable.
     nextMeta :: Metavar
+  , -- | Registered elaboration errors.
+    elabErrors :: [ElabError]
+  , -- | A map which contains for each base name the next numeral that is
+    -- going to be used for fresh metavariable creation. A missing name implies
+    -- that a metavariable with that base name has not yet been created.
+    metaCounters :: HashMap TyName Int
   }
 
--- Default methods
-freshMetaDefault :: MonadState Metacxt m => MetaInfo -> m Ty
-freshMetaDefault info = do
-  mcxt <- get
-  let m = nextMeta mcxt
-      newEntries = M.insert m (Unsolved, info) $ entries mcxt
-  put $ Metacxt newEntries (m + 1)
-  pure $ FreshMeta m
+instance Num Pos where
+  fromInteger = mkPos . fromInteger
+  (+) = undefined
+  (-) = undefined
+  (*) = undefined
+  negate = undefined
+  abs = undefined
+  signum = undefined
 
-lookupMetaDefault :: WithCS (MonadState Metacxt m) =>
-  Metavar -> m MetaEntry
-lookupMetaDefault m = do
-  mcxt <- get
-  case M.lookup m (entries mcxt) of
-    Just entry  -> pure entry
-    Nothing     -> devError $ "metavariable not in scope: " ++ show m
-
-updateMetaDefault :: WithCS (MonadState Metacxt m) =>
-  Metavar -> Ty -> m ()
-updateMetaDefault m a = do
-  mcxt <- get
-  if M.member m (entries mcxt)
-    then modify (putSolution $ Solved a)
-    else devError $ "metavariable not in scope: " ++ show m
-  where
-    putSolution sol mcxt = mcxt {entries = M.adjust f m $ entries mcxt}
-      where
-        f (_, info) = (sol, info)
-
-getMetasDefault :: MonadState Metacxt m => m SomeMetas
-getMetasDefault = SomeMetas . entries <$> get
-
-instance Metas Metacxt where
-  metasGet m = metasGet m . entries
-  metasToAssocList f = metasToAssocList f . entries
-
-type Elab = State Metacxt
+type Elab = ReaderT ElabCxt (ExceptT [ElabError] (State ElabSt))
 
 instance MonadMeta Elab where
-  freshMeta = freshMetaDefault
-  lookupMeta = lookupMetaDefault
-  updateMeta = updateMetaDefault
-  getMetas = getMetasDefault
+  freshMeta info = do
+    st <- get
+    let ElabSt {..} = st
+    let metaEntries' = M.insert nextMeta (Unsolved, info) metaEntries
+        nextMeta' = nextMeta + 1
+        st = ElabSt {metaEntries = metaEntries', nextMeta = nextMeta', ..}
+    put st
+    pure $ FreshMeta nextMeta
+  
+  lookupMeta m = do
+    st <- get
+    case M.lookup m (metaEntries st) of
+      Nothing     -> devError $ "metavariable not in scope: " ++ show m
+      Just entry  -> pure entry
+  
+  updateMeta m a = do
+    st <- get
+    let ElabSt {..} = st
+    case M.lookup m metaEntries of
+      Nothing -> devError $ "metavariable not in scope: " ++ show m
+      Just _  -> do
+        let f (_, info) = (Solved a, info)
+            metaEntries' = M.adjust f m metaEntries
+            st = ElabSt {metaEntries = metaEntries', ..}
+        put st
+  
+  getMetas = do
+    SomeMetas . metaEntries <$> get
 
-showReason :: UnificationErrorReason -> String
-showReason = \case
-  RigidMismatch       -> "rigid mismatch"
-  InvalidSpine        -> "invalid spine"
-  EscapingVariable l  -> "escaping variable: " ++ show l
-  Occurs m            -> "occurs check failed for: " ++ show m
+instance MonadElab Elab where
+  getElabCxt = ask
+  withElabCxt = local
+  
+  registerElabError err = do
+    st <- get
+    let ElabSt {..} = st
+    let elabErrors' = err : elabErrors
+        st = ElabSt {elabErrors = elabErrors', ..}
+    put st
 
-mcxt1 = Metacxt M.empty 0
-freshMetas = (\x -> freshMeta (MetaInfo 2 x)) <$$> map (\c -> [c, '0']) ['a'..'d']
-env = [VTyVar 1, VTyVar 0]
+  throwElabErrors = do
+    st <- get
+    let errors = elabErrors st
+    case errors of
+      []  -> devError "no registered elaboration errors"
+      _   -> throwError $ reverse errors
 
-testUnify :: Lvl -> Elab VTy -> Elab VTy -> IO ()
-testUnify n va vb =
-  let (r, mcxt') = runState (freshMetas >> runExceptT (bindM2 (unify n) (lift va) (lift vb))) mcxt1
-  in putStrLn $ either showReason (const $ showMetacxt mcxt') r
+  freshName x = do
+    st <- get
+    let ElabSt {..} = st
+    let n = M.findWithDefault 0 x metaCounters
+        metaCounters' = M.insert x (n + 1) metaCounters
+        st = ElabSt {metaCounters = metaCounters', ..}
+    put st
+    pure $ '?' : x ++ show n
+
+initCxt = ElabCxt
+  { topLevelCxt = TopLevelCxt 3 5 1
+  , names = Namespaces (M.fromList $ [ ("maybe"
+                                       , DataEntry 0 1 (SourcePos "<stdin>" 1 1)
+                                       )
+                                     , ( "T"
+                                       , DataEntry 1 0 (SourcePos "<stdin>" 8 1)
+                                       )
+                                     , ( "list"
+                                       , DataEntry 2 1 (SourcePos "<stdin>" 11 1)
+                                       )
+                                     ])
+                       (M.fromList $ [ ( "nothing"
+                                       , ConstructorEntry 0
+                                           (Data 0 [0]) ["a"]
+                                           (SourcePos "<stdin>" 2 4)
+                                       )
+                                     , ( "just"
+                                       , ConstructorEntry 1
+                                           (Fun 0 (Data 0 [0])) ["a"]
+                                           (SourcePos "<stdin>" 3 4)
+                                       )
+                                     , ( "id"
+                                       , TopLevelEntry 0
+                                           (VForAll "a" $ TClosure [] $ Fun 0 0)
+                                           (SourcePos "<stdin>" 5 1)
+                                       )
+                                     , ( "T"
+                                       , ConstructorEntry 2
+                                           (ForAll "a" $ Fun 0 (Data 1 [])) []
+                                           (SourcePos "<stdin>" 9 4)
+                                       )
+                                     , ( "nil"
+                                       , ConstructorEntry 3
+                                           (Data 2 [0]) ["a"]
+                                           (SourcePos "<stdin>" 12 4)
+                                       )
+                                     , ( "cons"
+                                       , ConstructorEntry 4
+                                           (Fun 0 $ Fun (Data 2 [0]) $ Data 2 [0]) ["a"]
+                                           (SourcePos "<stdin>" 13 4)
+                                       )
+                                     ])
+  , printInfo = PrintCxt [] ["list", "T", "maybe"] ["cons", "nil", "T", "just", "nothing"] [] ["id"]
+  , tyEnv = []
+  , tyLvl = 0
+  , tmLvl = 0
+  }
+
+emptySt = ElabSt
+  { metaEntries = M.empty
+  , nextMeta = 0
+  , elabErrors = []
+  , metaCounters = M.empty
+  }
+
+runElab :: Elab a -> (Either [ElabError] (a, PrintCxt), ElabSt)
+runElab m =
+  runState (runExceptT (runReaderT (pair m (printInfo <$> getElabCxt)) initCxt)) emptySt
+
+elabTest :: Parser a -> (a -> Elab b) -> (b -> PrintCxt -> SomeMetas -> String) -> IO ()
+elabTest p f g = do
+  s <- readInput
+  let res = parse (topLevel p) "<stdin>" s
+  case res of
+    Left bundle -> putStr $ errorBundlePretty bundle
+    Right a -> do
+      let (res, st) = runElab (f a)
+          src = arr $ lines s :: SourceFile
+          metas = SomeMetas $ metaEntries st
+      case res of
+        Left errs -> putStr . render . vcat $ map (($$ text "") . pretty (src, metas)) errs
+        Right (b, pcxt) -> putStrLn $ g b pcxt metas
+
+elabTestTy = elabTest ty checkTy printTy
   where
-    showMetacxt (Metacxt entries _) = 
-      let assocs = M.toList entries
-          xs = ["b", "a"]
-          tcxt = tyPCxt xs (map (fmap $ metaName . snd) assocs) ["list"]
-          showEntry (st, info) = render $
-            text (metaName info) <> text " = " <> case st of
-              Solved a  -> pretty tcxt a
-              Unsolved  -> char '?'
-      in  unlines $ map (\(m, entry) -> showEntry entry) assocs
+    printTy a (PrintCxt xs ts _ _ _) metas =
+      let tcxt = tyPCxt xs (toAssocList (metaName . snd) metas) (reverse ts)
+      in showPretty tcxt a
+
+elabTestPat = elabTest pat inferPat printPat
+  where
+    printPat (p, va, bindings) (PrintCxt xs ts cs _ _) metas =
+      let pcxt = patPCxt (reverse cs)
+          tcxt = tyPCxt xs (toAssocList (metaName . snd) metas) (reverse ts)
+          prettyBinding tcxt = \case
+            Left (x, va)  -> text x <+> colon <+> pretty (tcxt, metas) va
+            Right x       -> text x <+> colon <+> char '*'
+          prettyBindings tcxt = \case
+            []      -> (Text.PrettyPrint.empty, tcxt)
+            b : bs  -> let (d, tcxt') = prettyBindings (newBinding b tcxt) bs
+                       in  (prettyBinding tcxt b $$ d, tcxt')
+            where
+              newBinding b tcxt = case b of
+                Left _  -> tcxt
+                Right x -> tyBind x tcxt
+          (d, tcxt') = prettyBindings tcxt bindings
+      in render $
+             pretty pcxt p <+> colon <+> pretty (tcxt', metas) va
+          $$ nest 2 d

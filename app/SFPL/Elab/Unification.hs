@@ -36,22 +36,22 @@ liftPR (PartialRenaming dom cod ren) =
   PartialRenaming (dom + 1) (cod + 1) (M.insert cod dom ren)
 
 -- | Unification monad.
-type U a = forall m. MonadMeta m => ExceptT UnificationErrorReason m a
+type Unify a = forall m. MonadMeta m => ExceptT UnificationErrorReason m a
 
--- Lifting from MonadMeta to U.
-forceTy :: VTy -> U VTy
-forceTy va = lift $ E.forceTy va
+-- Lifting from EvalT to Unify.
+forceTy :: VTy -> Unify VTy
+forceTy va = E.forceTy va <$> lift getMetas
 
-($$$) :: TClosure -> VTy -> U VTy
-cl $$$ va = lift $ cl E.$$$ va
+($$$) :: TClosure -> VTy -> Unify VTy
+cl $$$ va = cl E.$$$ va <$> lift getMetas
 
 -- | Invert a spine, viewed as a renaming.
 -- This operation can fail if the spine does not consist of
 -- distinct bound variables.
-invert :: Lvl -> VTSpine -> U PartialRenaming
+invert :: Lvl -> VTSpine -> Unify PartialRenaming
 invert n sp = (\(dom, ren) -> PartialRenaming dom n ren) <$> go sp
   where
-    go :: VTSpine -> U (Lvl, HashMap Lvl Lvl)
+    go :: VTSpine -> Unify (Lvl, HashMap Lvl Lvl)
     go = \case
       []        -> pure (0, M.empty)
       sp :> va  -> do
@@ -63,11 +63,11 @@ invert n sp = (\(dom, ren) -> PartialRenaming dom n ren) <$> go sp
 -- | Perform a partial renaming, failing if either the renaming
 -- is not defined on a variable or the given metavariable occurs
 -- in the value.
-rename :: Metavar -> PartialRenaming -> VTy -> U Ty
+rename :: Metavar -> PartialRenaming -> VTy -> Unify Ty
 rename m pr@(PartialRenaming dom cod ren) va = forceTy va >>= \case
   VTyVar l      -> case M.lookup l ren of
     Just l' -> pure $ TyVar (lvl2Ix dom l')
-    Nothing -> throwError $ EscapingVariable l
+    Nothing -> throwError $ EscapingVariable (lvl2Ix cod l)
   VData l sp    -> Data l <$> renameSp m pr sp
   VMeta m' sp   | m == m'   -> throwError $ Occurs m
                 | otherwise -> Meta m' <$> renameSp m pr sp
@@ -79,21 +79,21 @@ rename m pr@(PartialRenaming dom cod ren) va = forceTy va >>= \case
   VFun va vb    -> Fun <$> rename m pr va <*> rename m pr vb
   VForAll x cl  -> ForAll x <$> (rename m (liftPR pr) =<< cl $$$ VTyVar cod)
 
-renameSp :: Metavar -> PartialRenaming -> VTSpine -> U TSpine
+renameSp :: Metavar -> PartialRenaming -> VTSpine -> Unify TSpine
 renameSp m pr = \case
   []        -> pure []
   sp :> va  -> (:>) <$> renameSp m pr sp <*> rename m pr va
 
 -- | Solve a pattern unification problem.
-solve :: Lvl -> Metavar -> VTSpine -> VTy -> U ()
+solve :: Lvl -> Metavar -> VTSpine -> VTy -> Unify ()
 solve n m sp va = do
   pr <- invert n sp
   sol <- rename m pr va
   lift $ updateMeta m sol
 
 -- | Unify expected and actual types.
-unify :: Lvl -> VTy -> VTy -> U ()
-unify n va vb = pair (forceTy va) (forceTy vb) >>= \case
+unify' :: Lvl -> VTy -> VTy -> Unify ()
+unify' n va vb = pair (forceTy va) (forceTy vb) >>= \case
   (VTyVar l    , VTyVar l'     )  | l == l'  -> pure ()
   (VData l sp  , VData l' sp'  )  | l == l'  -> unifySp n sp sp'
   (VMeta m sp  , VMeta m' sp'  )  | m == m'  -> unifySp n sp sp'
@@ -101,21 +101,28 @@ unify n va vb = pair (forceTy va) (forceTy vb) >>= \case
   (VTFloat     , VTFloat       )  -> pure ()
   (VTChar      , VTChar        )  -> pure ()
   (VTTuple vas , VTTuple vbs   )  -> unifyList n vas vbs
-  (VWorld va   , VWorld vb     )  -> unify n va vb
-  (VFun va vb  , VFun va' vb'  )  -> unify n va va' >> unify n vb vb'
-  (VForAll x cl, VForAll x' cl')  -> bindM2 (unify (n + 1)) (cl $$$ VTyVar n) (cl' $$$ VTyVar n)
+  (VWorld va   , VWorld vb     )  -> unify' n va vb
+  (VFun va vb  , VFun va' vb'  )  -> unify' n va va' >> unify' n vb vb'
+  (VForAll x cl, VForAll x' cl')  -> bindM2 (unify' (n + 1)) (cl $$$ VTyVar n) (cl' $$$ VTyVar n)
   (VMeta m sp  , va            )  -> solve n m sp va
   (va          , VMeta m sp    )  -> solve n m sp va
   _                               -> throwError RigidMismatch
 
-unifySp :: Lvl -> VTSpine -> VTSpine -> U ()
+unifySp :: Lvl -> VTSpine -> VTSpine -> Unify ()
 unifySp n sp sp' = case (sp, sp') of
-  ([]      , []       ) -> pure ()
-  (sp :> va, sp' :> vb) -> unifySp n sp sp' >> unify n va vb
-  _                     -> throwError RigidMismatch
+  ([]      , []        )  -> pure ()
+  (sp :> va, sp' :> va')  -> unifySp n sp sp' >> unify' n va va'
+  _                       -> throwError RigidMismatch
 
-unifyList :: Lvl -> [VTy] -> [VTy] -> U ()
+unifyList :: Lvl -> [VTy] -> [VTy] -> Unify ()
 unifyList n vas vbs = case (vas, vbs) of
   ([]      , []      )  -> pure ()
-  (va : vas, vb : vbs)  -> unify n va vb >> unifyList n vas vbs
+  (va : vas, vb : vbs)  -> unify' n va vb >> unifyList n vas vbs
   _                     -> throwError RigidMismatch
+
+-- | Unify expected and actual types, given the size of
+-- the current type context.
+--
+-- @since 1.0.0
+unify :: MonadMeta m => Lvl -> VTy -> VTy -> m (Maybe UnificationErrorReason)
+unify n va vb = either Just (const Nothing) <$> runExceptT (unify' n va vb)

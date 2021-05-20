@@ -31,37 +31,34 @@ data Namespaces = Namespaces
     terms :: HashMap Name TmEntry
   }
 
--- | A namespace entry for type identifiers, containing all
+-- | A namespace entry for type identifiers, containing
 -- relevant information about the type.
 --
 -- @since 1.0.0
 data TyEntry
   = -- | A data type, storing its top-level identifier, the number of
     -- type parameters it takes and the source position where it is defined.
-    DataEntry Lvl Lvl BegPos
+    DataEntry Lvl Int BegPos
   | -- | A type variable, storing the size of the context when it was bound.
     TyVarEntry Lvl
 
--- | A namespace entry for term identifiers, containing all
+-- | A namespace entry for term identifiers, containing
 -- relevant information about the term.
 --
 -- @since 1.0.0
 data TmEntry
   = -- | A top-level definition, storing its top-level identifier, type
     -- and the source position where it is defined.
-    TopLevelEntry Lvl Ty BegPos
-  | -- | A data constructor, storing its top-level identifier, type
+    TopLevelEntry Lvl VTy BegPos
+  | -- | A data constructor, storing its top-level identifier, type,
+    -- the names of the type parameters of the data type it belongs to,
     -- and the source position where it is defined.
-    ConstructorEntry Lvl Ty BegPos
-  | -- | A variable, storing the size of the context when it was bound
-    -- and its type.
-    VarEntry Lvl Ty
-
-tmEntryType :: TmEntry -> Ty
-tmEntryType = \case
-  TopLevelEntry _ a _     -> a
-  ConstructorEntry _ a _  -> a
-  VarEntry _ a            -> a
+    -- The type is not evaluated, because we need to apply the constructor to
+    -- the appropriate number of type parameters when pattern matching on it.
+    ConstructorEntry Lvl Ty [TyName] BegPos
+  | -- | A variable, storing the size of the context when it was bound and
+    -- its type.
+    VarEntry Lvl VTy
 
 -- | The printing context, containing information needed for pretty-printing.
 --
@@ -85,7 +82,7 @@ data PrintCxt = PrintCxt
 -- @since 1.0.0
 data ElabCxt = ElabCxt
   { -- | The top-level context.
-    topLevel :: TopLevelCxt
+    topLevelCxt :: TopLevelCxt
   , -- | The namespaces.
     names :: Namespaces
   , -- | The printing context.

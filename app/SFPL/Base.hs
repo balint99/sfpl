@@ -73,6 +73,7 @@ module SFPL.Base
     dsAnd,
     dsOr,
     dsIfThenElse,
+    dsList,
     dsNil,
     dsCons,
   )
@@ -448,6 +449,10 @@ dsOr = "or"
 -- | If-then-else.
 dsIfThenElse :: String
 dsIfThenElse = "ifThenElse"
+
+-- | List type.
+dsList :: String
+dsList = "list"
 
 -- | Empty list literal.
 dsNil :: String

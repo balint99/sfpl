@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, LambdaCase, MultiParamTypeClasses, ViewPatterns #-}
+{-# LANGUAGE LambdaCase, ViewPatterns #-}
 
 -- | Pretty-printing elaboration errors.
 module SFPL.Elab.Error.Pretty where
@@ -6,15 +6,18 @@ module SFPL.Elab.Error.Pretty where
 import Prelude hiding ((<>))
 
 import Data.Array.IArray (Array, (!))
-import Data.Function (on)
+import Data.Char (toUpper)
 import qualified Data.HashMap.Lazy as M
 import Data.List (nub)
 import SFPL.Base
 import SFPL.Elab.Context
 import SFPL.Elab.Error.Types
 import SFPL.Elab.Metacontext
+import SFPL.Eval (VTyPCxt, VTy)
 import SFPL.Syntax.Core
+import SFPL.Syntax.Raw.Instances
 import SFPL.Syntax.Raw.Types (BegPos, EndPos)
+import SFPL.Utils
 import Text.Megaparsec.Pos
 import Text.PrettyPrint
 
@@ -24,47 +27,76 @@ prettySourcePos (SourcePos fileName (unPos -> lnum) (unPos -> cnum))
   = text fileName <> colon <> int lnum <> colon <> int cnum
 
 -- | Pretty-print a given type of elaboration error.
-prettyErrorType :: TyPCxt -> ElabErrorType -> Doc
-prettyErrorType tcxt = \case
-  NotInScopeError x cat ->
-    let s = case cat of
-          SCType        -> "Type"
-          SCVariable    -> "Variable"
-          SCConstructor -> "Data constructor"
-    in  text s <+> text "not in scope:" <+> quotes (text x)
+prettyErrorType :: TyPCxt -> ElabCxt -> SomeMetas -> ElabErrorType -> Doc
+prettyErrorType tcxt cxt metas = \case
+  NotInScopeError x cats ->
+    let ns = map scName cats
+        prettyNames (n : ns) = text (capitalize n) <> prettyNames' ns
+          where
+            prettyNames' = \case
+              []      -> empty
+              [n]     -> text " or" <+> text n
+              n : ns  -> comma <+> prettyNames' ns
+    in  prettyNames ns <+> text "not in scope:" <+> quotes (text x)
   MultipleDeclarationsError x prev ->
       text "Multiple declarations of" <+> quotes (text x)
    $$ text "Previous declaration was at" <+> prettySourcePos prev
-  UnificationError expected actual reason ->
-        text "Couldn't match expected type" <+> quotes (pretty tcxt expected)
-    <+> text "with actual type" <+> quotes (pretty tcxt actual)
+  MalformedTypeError a reason ->
+    let explanation = case reason of
+          IllegalApplication        ->
+            text "Only data types may be applied to arguments"
+          BadDataApplication x n n' ->
+              text "Bad number of arguments applied to" <+> quotes (text x)
+           $$ text "Expected" <+> int n <> text ", got" <+> int n'
+    in  text "Malformed type" <+> quotes (pretty' a)
+     $$ explanation
+  MalformedPatternError pat ->
+    text "Malformed pattern" <+> quotes (pretty' pat)
+  UnificationError vexp vact reason ->
+    let vcxt = (tcxt, metas)
+        explanation = case reason of
+          RigidMismatch       -> empty
+          InvalidSpine        -> empty
+          EscapingVariable i  ->
+            text "Variable" <+> pretty tcxt (TyVar i) <+> text "escapes its scope"
+          Occurs m            ->
+            text (nameOf m) <+> text "occurs recursively in the equation"
+          where
+            nameOf m = metaName . snd $ getMeta m metas
+    in  text "Couldn't match expected type" <+> quotes (pretty vcxt vexp)
+    <+> text "with actual type" <+> quotes (pretty vcxt vact)
+     $$ explanation
   AmbiguousOverloading otype ->
     let (s, x) = case otype of
           OTOperator op -> ("operator", op)
           OTFunction x  -> ("built-in function", x)
     in  text "Ambiguous use of" <+> text s <+> quotes (text x)
-  HoleError a ->
-    text "Found hole: _ :" <+> pretty tcxt a
+  HoleError va ->
+    let vcxt = (tcxt, metas)
+    in  text "Found hole: _ :" <+> pretty vcxt va
+  where
+    capitalize (c : cs) = toUpper c : cs
 
-prettyBinding :: TyPCxt -> (Name, Ty) -> Doc
-prettyBinding tcxt (x, a) = text x <+> char ':' <+> pretty tcxt a
+prettyBinding :: VTyPCxt -> (Name, VTy) -> Doc
+prettyBinding vcxt (x, va) = text x <+> char ':' <+> pretty vcxt va
 
 -- | Pretty-print an elaboration error item.
-prettyErrorItem :: TyPCxt -> ElabCxt -> ElabErrorItem -> Doc
-prettyErrorItem tcxt cxt = \case
+prettyErrorItem :: TyPCxt -> ElabCxt -> SomeMetas -> ElabErrorItem -> Doc
+prettyErrorItem tcxt cxt metas = \case
   Bindings  ->
     let xs = tmVars $ printInfo cxt
         ns = terms $ names cxt
-        bindings = map (prettyBinding tcxt . withType) $ nub xs
+        vcxt = (tcxt, metas)
+        bindings = map (prettyBinding vcxt . withType) . nub $ filter (/= "_") xs
           where
-            withType x = (x, tmEntryType $ ns M.! x)
+            withType x = (x, getType $ ns M.! x)
+            getType = \case
+              VarEntry l va -> va
+              _             -> devError "cannot print binding: not a variable"
     in  case bindings of
           []  -> text "Local bindings in scope: none"
           _   -> text "Local bindings in scope:"
               $$ nest 2 (vcat bindings)
-
--- | The contents of a source file as an array of lines.
-type SourceFile = Array Int String
 
 -- | Pretty-print the offending line.
 prettyOffendingLine :: SourceFile -> BegPos -> EndPos -> Doc
@@ -81,16 +113,27 @@ prettyOffendingLine src beg end =
    $$ text lineNumber <+> char '|' <+> text line
    $$ padding <+> char '|' <+> text (replicate (begCol - 1) ' ') <> marker
 
--- | Pretty-print an elaboration error, given the contents of the source file.
+-- | The contents of a source file as an array of lines.
 --
 -- @since 1.0.0
-prettyElabError :: SourceFile -> ElabError -> Doc
-prettyElabError src (ElabError cxt metas errorSpan errorType errorItems) =
+type SourceFile = Array Int String
+
+-- | Information context for printing errors.
+--
+-- @since 1.0.0
+type ErrorPCxt = (SourceFile, SomeMetas)
+
+-- | Pretty-print an elaboration error, given the contents of the source file
+-- and the state of the metacontext at the end of elaboration.
+--
+-- @since 1.0.0
+prettyElabError :: ErrorPCxt -> ElabError -> Doc
+prettyElabError (src, metas) (ElabError cxt errorSpan errorType errorItems) =
   let PrintCxt xs ts _ _ _ = printInfo cxt
-      tcxt = tyPCxt xs (toAssocList (metaName . snd) metas) ts
+      tcxt = tyPCxt xs (toAssocList (metaName . snd) metas) (reverse ts)
       (beg, end) = errorSpan
-      theError = prettyErrorType tcxt errorType
-      items = map (prettyErrorItem tcxt cxt) errorItems
+      theError = prettyErrorType tcxt cxt metas errorType
+      items = map (prettyErrorItem tcxt cxt metas) errorItems
       body = case items of
         []  -> theError
         _   -> vcat . map (\d -> char '*' $$ nest 2 d) $ theError : items
@@ -98,6 +141,3 @@ prettyElabError src (ElabError cxt metas errorSpan errorType errorItems) =
   in  prettySourcePos beg <> text ": error:"
    $$ nest 4 body
    $$ offendingLine
-
-instance Pretty SourceFile ElabError where
-  pretty = prettyElabError

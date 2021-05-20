@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 
 -- | Errors that can occur during elaboration.
 module SFPL.Elab.Error.Types where
@@ -5,8 +6,8 @@ module SFPL.Elab.Error.Types where
 import SFPL.Base
 import SFPL.Elab.Context
 import SFPL.Elab.Metacontext
-import SFPL.Syntax.Core.Types
-import SFPL.Syntax.Raw.Types (BegPos, Span)
+import SFPL.Syntax.Raw.Types
+import SFPL.Eval.Types
 
 -- | Any kind of elaboration error.
 --
@@ -14,8 +15,6 @@ import SFPL.Syntax.Raw.Types (BegPos, Span)
 data ElabError = ElabError
   { -- | State of elaboration context at the point when the error occured.
     elabErrorCxt :: ElabCxt
-  , -- | State of metacontext at the point when the error occured.
-    elabErrorMetas :: SomeMetas
   , -- | The precise span in the source where the error occured.
     elabErrorSpan :: Span
   , -- | The type of the error, which includes further details.
@@ -29,13 +28,20 @@ data ElabError = ElabError
 -- @since 1.0.0
 data ElabErrorType
   = -- | An identifier is not in scope.
-    -- Includes the unknown name and expected syntactic category.
-    NotInScopeError Name SyntacticCategory
+    -- Includes the unknown name and expected syntactic categories (at least 1).
+    NotInScopeError Name [SyntacticCategory]
   | -- | Multiple declarations of an identifier.
     -- Includes the name, and the source position of the previous declaration.
     MultipleDeclarationsError Name BegPos
-  | -- | A unification error. Includes the expected and inferred types.
-    UnificationError Ty Ty UnificationErrorReason
+  | -- | A type is malformed (ill-kinded).
+    -- | Includes the malformed type and the reason for the failure.
+    MalformedTypeError Ty MalformedTypeErrorReason
+  | -- | A constructor pattern is malformed.
+    -- | Includes the malformed pattern.
+    MalformedPatternError Pattern
+  | -- | A unification error.
+    -- Includes the expected and inferred type, and the reason for the failure.
+    UnificationError VTy VTy UnificationErrorReason
   {-| -- | A metavariable is ambiguous.
     -- Includes the identifier of the metavariable.
     AmbiguousMeta Metavar-}
@@ -44,7 +50,7 @@ data ElabErrorType
     AmbiguousOverloading OverloadType
   | -- | A term hole was encountered.
     -- Includes the expected type of the hole.
-    HoleError Ty
+    HoleError VTy
 
 -- | The types of syntactic elements which can generate a scope error.
 --
@@ -57,6 +63,25 @@ data SyntacticCategory
   | -- | A data constructor.
     SCConstructor
 
+-- | Get the name of a syntactic category.
+--
+-- @since 1.0.0
+scName :: SyntacticCategory -> String
+scName = \case
+  SCType        -> "type"
+  SCVariable    -> "variable"
+  SCConstructor -> "data constructor"
+
+-- | The reason why a type was malformed.
+--
+-- @since 1.0.0
+data MalformedTypeErrorReason
+  = -- | A type other than a type constructor was applied to arguments.
+    IllegalApplication
+  | -- | A data type was not supplied the appropriate number of type parameters.
+    -- Includes the name of the type, expected and actual number of parameters.
+    BadDataApplication TyName Int Int
+
 -- | The reason why a unification failed.
 --
 -- @since 1.0.0
@@ -66,7 +91,7 @@ data UnificationErrorReason
   | -- | The spine did not consist of distinct bound variables.
     InvalidSpine
   | -- | The right hand contained a free variable not contained in the spine.
-    EscapingVariable Lvl
+    EscapingVariable Ix
   | -- | The metavariable solved for occurred recursively in the equation.
     Occurs Metavar
 
