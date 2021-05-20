@@ -96,8 +96,8 @@ quoteTy n va = forceTy va >>= \case
 -- | Quote a type value spine.
 quoteTSp :: Lvl -> VTSpine -> EvalT TSpine
 quoteTSp n = \case
-  []      -> pure []
-  sp :> a -> (:>) <$> quoteTSp n sp <*> quoteTy n a
+  []        -> pure []
+  sp :> va  -> (:>) <$> quoteTSp n sp <*> quoteTy n va
 
 -- | Information context for type values.
 --
@@ -108,7 +108,8 @@ type VTyPCxt = (TyPCxt, SomeMetas)
 --
 -- @since 1.0.0
 prettyVTy :: Prec -> VTyPCxt -> VTy -> Doc
-prettyVTy p (tcxt@(xs, _, _), metas) va = prettyPrec p tcxt $ quoteTy (Lvl $ length xs) va metas
+prettyVTy p (tcxt@(xs, _, _), metas) va =
+  prettyPrec p tcxt $ quoteTy (Lvl $ length xs) va metas
 
 -- | @since 1.0.0
 instance Pretty VTyPCxt VTy where

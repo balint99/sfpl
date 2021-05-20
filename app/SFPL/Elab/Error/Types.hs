@@ -36,6 +36,13 @@ data ElabErrorType
   | -- | A type is malformed (ill-kinded).
     -- | Includes the malformed type and the reason for the failure.
     MalformedTypeError Ty MalformedTypeErrorReason
+  | -- | A type hole was found in an invalid place.
+    -- Includes the type and the place.
+    InvalidTypeHoleError Ty TypeHolePlace
+  | -- | The return type of a data constructor doesn't match the type
+    -- the type that defines it.
+    -- Includes the name of the constructor and the return type.
+    BadConstructorType Name Ty
   | -- | A constructor pattern is malformed.
     -- | Includes the malformed pattern.
     MalformedPatternError Pattern
@@ -81,6 +88,15 @@ data MalformedTypeErrorReason
   | -- | A data type was not supplied the appropriate number of type parameters.
     -- Includes the name of the type, expected and actual number of parameters.
     BadDataApplication TyName Int Int
+
+-- | The place of a type signature when type holes are not allowed.
+--
+-- @since 1.0.0
+data TypeHolePlace
+  = -- | Type signature of a top-level definition.
+    THPTopLevelDef
+  | -- | Type signature of a data constructor.
+    THPConstructor
 
 -- | The reason why a unification failed.
 --

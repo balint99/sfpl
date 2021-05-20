@@ -50,6 +50,17 @@ prettyErrorType tcxt cxt metas = \case
            $$ text "Expected" <+> int n <> text ", got" <+> int n'
     in  text "Malformed type" <+> quotes (pretty' a)
      $$ explanation
+  InvalidTypeHoleError a place  ->
+    let s = case place of
+          THPTopLevelDef  -> "top-level definitions"
+          THPConstructor  -> "data constructors"
+    in  text "Invalid type hole in" <+> quotes (pretty' a)
+     $$ text "Type holes are not allowed the type signatures of" <+> text s
+  BadConstructorType x a  ->
+      text "Invalid return type for data constructor" <+> quotes (text x)
+   <> colon <+> quotes (pretty' a)
+   $$ text "The return type of a data constructor must be"
+   $$ nest 2 (text "its parent data type applied to its type parameters")
   MalformedPatternError pat ->
     text "Malformed pattern" <+> quotes (pretty' pat)
   UnificationError vexp vact reason ->

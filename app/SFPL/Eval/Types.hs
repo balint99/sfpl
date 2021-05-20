@@ -142,7 +142,7 @@ type EvalError = String
 -- @since 1.0.0
 type EvalT = (->) SomeMetas
 
--- | Pure evaluation monad.
+-- | Pure term evaluation monad.
 --
 -- @since 1.0.0
 type EvalP = ReaderT EvalCxt (Either EvalError)

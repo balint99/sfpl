@@ -63,8 +63,14 @@ badData :: R.Ty -> TyName -> Int -> Int -> M ()
 badData r x n n' =
   registerError r (MalformedTypeError r $ BadDataApplication x n n') []
 
-badConstructor :: R.Pattern -> M ()
-badConstructor r = registerError r (MalformedPatternError r) []
+invalidHole :: R.Ty -> TypeHolePlace -> M ()
+invalidHole r place = registerError r (InvalidTypeHoleError r place) []
+
+badCtrReturnType :: R.Ty -> Name -> M ()
+badCtrReturnType r x = registerError r (BadConstructorType x r) []
+
+badCtrPat :: R.Pattern -> M ()
+badCtrPat r = registerError r (MalformedPatternError r) []
 
 cantUnify :: Raw r => r -> VTy -> VTy -> UnificationErrorReason -> M ()
 cantUnify r vexp vact reason =
@@ -151,44 +157,56 @@ checkTyIden r x = do
                       | otherwise -> stopAfter $ badData r x c 0
       TyVarEntry l    -> (\n -> TyVar (lvl2Ix n l)) <$> getTyLvl
 
-checkTuple :: [R.Ty] -> M Ty
-checkTuple = \case
-  [a] -> checkTy a
-  as  -> Tuple <$> (checkTy <$$> as)
+checkTuple :: MonadElab m => m Ty -> [R.Ty] -> m Ty
+checkTuple h = \case
+  [a] -> checkTy' h a
+  as  -> Tuple <$> (checkTy' h <$$> as)
 
-checkTApp :: R.Ty -> R.Ty -> R.TSpine -> M Ty
-checkTApp r a as = case a of
-  r'@(R.TyIden x _) -> do
-    me <- lookupTy x
-    case me of
-      Nothing     -> stopAfter $ notInScope r' x [SCType]
-      Just entry  -> case entry of
-        DataEntry l c _ | c == spLen -> Data l <$> (checkTy <$$> as)
-                        | otherwise  -> stopAfter $ badData r x c spLen
-        TyVarEntry _    -> illegal
-  _                 -> illegal
+checkTApp' :: MonadElab m => m Ty -> R.Ty -> R.Ty -> Name -> R.TSpine -> m Ty
+checkTApp' h r r' x as = do
+  me <- lookupTy x
+  case me of
+    Nothing     -> stopAfter $ notInScope r' x [SCType]
+    Just entry  -> case entry of
+      DataEntry l c _ | c == spLen -> Data l <$> (checkTy' h <$$> reverse as)
+                      | otherwise  -> stopAfter $ badData r x c spLen
+      TyVarEntry _    -> illegal
   where
     illegal = stopAfter $ badTyApp r
     spLen = length as
+    
 
-checkForAll :: [TyName] -> R.Ty -> M Ty
-checkForAll xs a = case xs of
-  []      -> checkTy a
-  x : xs  -> ForAll x <$> (withTyVar x $ checkForAll xs a)
+checkTApp :: MonadElab m => m Ty -> R.Ty -> R.Ty -> R.TSpine -> m Ty
+checkTApp h r a as = case a of
+  r'@(R.TyIden x _) -> checkTApp' h r r' x as
+  _                 -> illegal
+  where
+    illegal = stopAfter $ badTyApp r
 
--- | Check that a type is well-formed.
-checkTy :: R.Ty -> M Ty
-checkTy r = case r of
+checkForAll :: MonadElab m => m Ty -> [TyName] -> R.Ty -> m Ty
+checkForAll h xs a = case xs of
+  []      -> checkTy' h a
+  x : xs  -> ForAll x <$> (withTyVar x $ checkForAll h xs a)
+
+-- | Check that a type is well-formed. The first parameter gives
+-- the action to perform on holes.
+checkTy' :: MonadElab m => m Ty -> R.Ty -> m Ty
+checkTy' h r = case r of
   R.TyIden x _    -> checkTyIden r x
-  R.THole _       -> freshNamedMeta "t"
+  R.THole _       -> h
   R.Int _ _       -> pure Int
   R.Float _ _     -> pure Float
   R.Char _ _      -> pure Char
-  R.Tuple as _ _  -> checkTuple as
-  R.World a _     -> World <$> checkTy a
-  R.TApp a as     -> checkTApp r a as
-  R.Fun a b       -> Fun <$> checkTy a <*> checkTy b
-  R.ForAll xs a _ -> checkForAll xs a
+  R.Tuple as _ _  -> checkTuple h as
+  R.List a _ _    -> checkTApp' h r r dsList [a]
+  R.World a _     -> World <$> checkTy' h a
+  R.TApp a as     -> checkTApp h r a as
+  R.Fun a b       -> Fun <$> checkTy' h a <*> checkTy' h b
+  R.ForAll xs a _ -> checkForAll h xs a
+
+-- | Check that a type is well-formed. Creates fresh metavariables on holes.
+checkTy :: R.Ty -> M Ty
+checkTy = checkTy' (freshNamedMeta "t")
 
 ------------------------------------------------------------
 -- Patterns
@@ -246,7 +264,9 @@ inferCtrPat r x args = do
     scopeError = stopAfter $ notInScope r x [SCConstructor]
     go args va = case args of
       []          -> pure (va, [])
-      arg : args' -> forceTy va >>= \va -> case (arg, va) of
+      -- no need to force va, because it only contains
+      -- fresh metavariables
+      arg : args' -> case (arg, va) of
         (Left x , VFun va vb  ) -> do
           (va', bindings) <- go args' vb
           pure (va', Left (x, va) : bindings)
@@ -260,7 +280,7 @@ inferCtrPat r x args = do
           withTyVar x $ do
             (va', bindings) <- go args' vb
             pure (va', Right x : bindings)
-        _                       -> stopAfter $ badConstructor r
+        _                       -> stopAfter $ badCtrPat r
 
 -- | Infer the type of a pattern.
 -- Returns the inferred type and the list of variables
@@ -284,4 +304,34 @@ inferPat r = case r of
 ------------------------------------------------------------
 -- Type declarations
 
+returnType :: R.Ty -> R.Ty
+returnType = \case
+  R.Fun a b       -> returnType b
+  R.ForAll x a _  -> returnType a
+  r               -> r
 
+checkReturnType :: Name -> Lvl -> R.Ty -> Ty -> Ix -> M ()
+checkReturnType x l r a n = case a of
+  Fun a b     -> checkReturnType x l r b n
+  ForAll y a  -> checkReturnType x l r a (n + 1)
+  Data l' sp  | l == l'   -> go sp n
+              | otherwise -> illegal
+  _           -> illegal
+  where
+    illegal = stopAfter $ badCtrReturnType r x
+    go sp n = case sp of
+      []            -> pure ()
+      sp :> TyVar i | i == n  -> go sp (n + 1)
+      _             -> illegal
+
+-- | Check that a data constructor's type is well-formed
+-- and that it is appropriate: doesn't contain any holes,
+-- and the return type is the same as the data type that defines it.
+checkCtrTy :: Name -> Lvl -> R.Ty -> M Ty
+checkCtrTy x l r = do
+  let ret = returnType r
+  a <- checkTy' illegal r
+  checkReturnType x l ret a 0
+  pure a
+  where
+    illegal = stopAfter $ invalidHole r THPConstructor

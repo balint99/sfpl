@@ -115,7 +115,7 @@ instance MonadElab Elab where
     pure $ '?' : x ++ show n
 
 initCxt = ElabCxt
-  { topLevelCxt = TopLevelCxt 3 5 1
+  { topLevelCxt = TopLevelCxt 4 7 1
   , names = Namespaces (M.fromList $ [ ("maybe"
                                        , DataEntry 0 1 (SourcePos "<stdin>" 1 1)
                                        )
@@ -124,6 +124,9 @@ initCxt = ElabCxt
                                        )
                                      , ( "list"
                                        , DataEntry 2 1 (SourcePos "<stdin>" 11 1)
+                                       )
+                                     , ( "either"
+                                       , DataEntry 3 2 (SourcePos "<stdin>" 15 1)
                                        )
                                      ])
                        (M.fromList $ [ ( "nothing"
@@ -157,8 +160,19 @@ initCxt = ElabCxt
                                            (Fun 0 $ Fun (Data 2 [0]) $ Data 2 [0]) ["a"]
                                            (SourcePos "<stdin>" 13 4)
                                        )
+                                     , ( "left"
+                                       , ConstructorEntry 5
+                                           (Fun 1 $ Data 3 [0, 1]) ["a", "b"]
+                                           (SourcePos "<stdin>" 16 4)
+                                       )
+                                     , ( "right"
+                                       , ConstructorEntry 6
+                                           (Fun 0 $ Data 3 [0, 1]) ["a", "b"]
+                                           (SourcePos "<stdin>" 17 4)
+                                       )  
                                      ])
-  , printInfo = PrintCxt [] ["list", "T", "maybe"] ["cons", "nil", "T", "just", "nothing"] [] ["id"]
+  , printInfo = PrintCxt [] ["either", "list", "T", "maybe"]
+                            ["right", "left", "cons", "nil", "T", "just", "nothing"] [] ["id"]
   , tyEnv = []
   , tyLvl = 0
   , tmLvl = 0
@@ -170,6 +184,9 @@ emptySt = ElabSt
   , elabErrors = []
   , metaCounters = M.empty
   }
+
+instance {-# OVERLAPPING #-} MonadFail Elab where
+  fail = error
 
 runElab :: Elab a -> (Either [ElabError] (a, PrintCxt), ElabSt)
 runElab m =
@@ -193,6 +210,15 @@ elabTestTy = elabTest ty checkTy printTy
   where
     printTy a (PrintCxt xs ts _ _ _) metas =
       let tcxt = tyPCxt xs (toAssocList (metaName . snd) metas) (reverse ts)
+      in showPretty tcxt a
+
+elabTestCtrTy x xs y = elabTest ty elabCtrTy printTy
+  where
+    elabCtrTy r = do
+      Just (DataEntry l _ _) <- lookupTy x
+      foldl (\f x -> f . withTyVar x) id xs $ checkCtrTy y l r
+    printTy a (PrintCxt _ ts _ _ _) metas =
+      let tcxt = tyPCxt (reverse xs) (toAssocList (metaName . snd) metas) (reverse ts)
       in showPretty tcxt a
 
 elabTestPat = elabTest pat inferPat printPat
