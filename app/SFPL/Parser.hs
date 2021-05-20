@@ -120,7 +120,8 @@ isOpChar :: Char -> Bool
 isOpChar = (`elem` ['+', '-', '*', '/', '^', '=', '!', '<', '>', '&', '|', ':', '~', '%'])
 
 isSpecialChar :: Char -> Bool
-isSpecialChar c = isOpChar c || c `elem` ['@', '(', ')', '[', ']', '{', '}', '\\', '.', ',', ';']
+isSpecialChar c = isOpChar c
+  || c `elem` ['@', '(', ')', '[', ']', '{', '}', '\\', '.', ',', ';', '\'', '"']
 
 isValidToken :: Char -> Bool
 isValidToken c = isIdenChar c || isSpecialChar c || isSpace c
