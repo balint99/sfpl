@@ -55,7 +55,7 @@ prettyErrorType tcxt cxt metas = \case
           THPTopLevelDef  -> "top-level definitions"
           THPConstructor  -> "data constructors"
     in  text "Invalid type hole in" <+> quotes (pretty' a)
-     $$ text "Type holes are not allowed the type signatures of" <+> text s
+     $$ text "Type holes are not allowed the in type signatures of" <+> text s
   BadConstructorType x a  ->
       text "Invalid return type for data constructor" <+> quotes (text x)
    <> colon <+> quotes (pretty' a)

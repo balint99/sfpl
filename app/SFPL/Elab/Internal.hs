@@ -15,7 +15,7 @@ import qualified SFPL.Elab.Unification as U
 import qualified SFPL.Eval as E
 import SFPL.Eval.Types
 import SFPL.Syntax.Core.Types
-import SFPL.Syntax.Raw.Types (Raw (..))
+import SFPL.Syntax.Raw.Types (Raw (..), BegPos)
 import qualified SFPL.Syntax.Raw.Types as R
 import SFPL.Utils
 
@@ -27,6 +27,15 @@ infixl 9 $$$
 type M a = forall m. MonadElab m => m a
 
 -- Lookup
+
+getNextTypeDecl :: M Lvl
+getNextTypeDecl = nextTypeDecl . topLevelCxt <$> getElabCxt
+
+getNextConstructor :: M Lvl
+getNextConstructor = nextConstructor . topLevelCxt <$> getElabCxt
+
+getNextTopLevelDef :: M Lvl
+getNextTopLevelDef = nextTopLevelDef . topLevelCxt <$> getElabCxt
 
 lookupTy :: TyName -> M (Maybe TyEntry)
 lookupTy x = M.lookup x . types . names <$> getElabCxt
@@ -56,6 +65,9 @@ stopAfter ma = ma >> throwElabErrors
 notInScope :: Raw r => r -> Name -> [SyntacticCategory] -> M ()
 notInScope r x cats = registerError r (NotInScopeError x cats) []
 
+multipleDecls :: Raw r => r -> Name -> BegPos -> M ()
+multipleDecls r x beg = registerError r (MultipleDeclarationsError x beg) []
+
 badTyApp :: R.Ty -> M ()
 badTyApp r = registerError r (MalformedTypeError r IllegalApplication) []
 
@@ -76,20 +88,16 @@ cantUnify :: Raw r => r -> VTy -> VTy -> UnificationErrorReason -> M ()
 cantUnify r vexp vact reason =
   registerError r (UnificationError vexp vact reason) []
 
--- Managing type context
+newHole :: R.Tm -> VTy -> M ()
+newHole r va = registerError r (HoleError va) [Bindings]
 
--- | Create a fresh metavariable with the given name.
-freshNamedMeta :: TyName -> M Ty
-freshNamedMeta x = do
-  n <- getTyLvl
-  x <- freshName x
-  freshMeta $ MetaInfo n x
+-- Managing context
 
 -- | Bind a new type variable.
 withTyVar :: MonadElab m => TyName -> m a -> m a
-withTyVar x = withElabCxt (bindTyVar x)
+withTyVar x = withElabCxt bindTyVar
   where
-    bindTyVar x ElabCxt {..} =
+    bindTyVar ElabCxt {..} =
       let Namespaces {..} = names
           PrintCxt {..} = printInfo
           types' = M.insert x (TyVarEntry tyLvl) types
@@ -100,6 +108,10 @@ withTyVar x = withElabCxt (bindTyVar x)
       let names = Namespaces {types = types', ..}
           printInfo = PrintCxt {tyVars = tyVars', ..}
       in ElabCxt {tyEnv = tyEnv', tyLvl = tyLvl', ..}
+
+-- | Bind multiple type variables.
+withTyVars :: MonadElab m => [TyName] -> m a -> m a
+withTyVars = foldr (\x f -> withTyVar x . f) id
 
 -- | Bind a new implicit type variable.
 withImplTyVar :: MonadElab m => TyName -> m a -> m a
@@ -113,6 +125,16 @@ withImplTyVar x = withElabCxt (bindImplTyVar x)
       in
       let printInfo = PrintCxt {tyVars = tyVars', ..}
       in ElabCxt {tyEnv = tyEnv', tyLvl = tyLvl', ..}
+
+-- | Reset all local information, but keep top-level bindings.
+atTopLevel :: MonadElab m => m a -> m a
+atTopLevel = withElabCxt dropLocal
+  where
+    dropLocal ElabCxt {..} =
+      let PrintCxt {..} = printInfo
+      in
+      let printInfo = PrintCxt {tyVars = [], tmVars = [], ..}
+      in ElabCxt {tyEnv = [], tyLvl = 0, tmLvl = 0, ..}
 
 --  Type evaluation
 -- Lifting from EvalT to MonadElab
@@ -135,6 +157,17 @@ forceTy :: VTy -> M VTy
 forceTy va = E.forceTy va <$> getMetas
 
 -- Unification
+
+-- | Create a fresh metavariable with the given name.
+freshNamedMeta :: TyName -> M Ty
+freshNamedMeta x = do
+  n <- getTyLvl
+  x <- freshName x
+  freshMeta $ MetaInfo n x
+
+-- | Create a fresh evaluated metavariable with the given name.
+freshNamedMeta' :: TyName -> M VTy
+freshNamedMeta' = evalTy' <=< freshNamedMeta
 
 unify :: Raw r => r -> VTy -> VTy -> M ()
 unify r vexp vact = do
@@ -234,7 +267,7 @@ inferTuplePat xs = do
     go xs ms = case (xs, ms) of
       ([]    , _     )  -> pure ([], [])
       (x : xs, m : ms)  -> do
-        va <- evalTy' =<< freshNamedMeta m
+        va <- freshNamedMeta' m
         (vas, bindings) <- go xs ms
         pure (va : vas, Left (x, va) : bindings)
     tupleMetaNames = [replicate c x | c <- [1 ..], x <- ['a' .. 'z']]
@@ -242,9 +275,11 @@ inferTuplePat xs = do
 insertForCtr :: VTy -> Int -> M VTy
 insertForCtr va = \case
   0 -> pure va
+  -- no need to force here, because a constructors type
+  -- cannot contain metavariables
   c -> case va of
     VForAll x cl  -> do
-      m <- evalTy' =<< freshNamedMeta x
+      m <- freshNamedMeta' x
       vb <- cl $$$ m
       insertForCtr vb (c - 1)
     _             -> devError "can't insert for constructor: not a forall type"
@@ -300,10 +335,67 @@ inferPat r = case r of
 ------------------------------------------------------------
 -- Terms
 
+-- | Check that a term has the given type.
+checkTm :: R.Tm -> VTy -> M Tm
+checkTm r va = forceTy va >>= \va -> case (r, va) of
+  _ -> undefined
 
+-- | Infer the type of a term.
+inferTm :: R.Tm -> M (Tm, VTy)
+inferTm r = case r of
+  _ -> undefined
+
+----------------------------------------
+-- Top-level definitions
+
+checkTopLevelDefScope :: R.TopLevelDef -> M ()
+checkTopLevelDefScope r@(R.TL x _ _ _ _) = do
+  me <- lookupTm x
+  case me of
+    Nothing     -> pure ()
+    Just entry  -> case entry of
+      TopLevelEntry _ _ prev      -> err prev
+      ConstructorEntry _ _ _ prev -> err prev
+      _                           -> devError "previous declaration was not a top-level binding"
+  where
+    err prev = stopAfter $ multipleDecls r x prev
+
+-- | Bind a new top-level definition.
+withTopLevel :: MonadElab m => Name -> VTy -> BegPos -> m a -> m a
+withTopLevel x va beg = withElabCxt bindTopLevel
+  where
+    bindTopLevel ElabCxt {..} =
+      let TopLevelCxt {..} = topLevelCxt
+          Namespaces {..} = names
+          PrintCxt {..} = printInfo
+          terms' = M.insert x (TopLevelEntry nextTopLevelDef va beg) terms
+          nextTopLevelDef' = nextTopLevelDef + 1
+          topLevelDefNames' = topLevelDefNames :> x
+      in
+      let topLevelCxt = TopLevelCxt {nextTopLevelDef = nextTopLevelDef', ..}
+          names = Namespaces {terms = terms', ..}
+          printInfo = PrintCxt {topLevelDefNames = topLevelDefNames', ..}
+      in ElabCxt {..}
+
+-- | Elaborate a top-level definition.
+withTopLevelDef :: MonadElab m => R.TopLevelDef -> (TopLevelDef -> m a) -> m a
+withTopLevelDef r@(R.TL x a t beg _) f = do
+  checkTopLevelDefScope r
+  l <- getNextTopLevelDef
+  a <- checkTy' illegalTy a
+  va <- evalTy [] a
+  withTopLevel x va beg $ do
+    t <- checkTm t va
+    let tl = TL x a t
+    f tl
+  where
+    illegalTy = stopAfter $ invalidHole a THPTopLevelDef
 
 ------------------------------------------------------------
 -- Type declarations
+
+----------------------------------------
+-- Constructors
 
 returnType :: R.Ty -> R.Ty
 returnType = \case
@@ -331,8 +423,112 @@ checkReturnType x l r a n = case a of
 checkCtrTy :: Name -> Lvl -> R.Ty -> M Ty
 checkCtrTy x l r = do
   let ret = returnType r
-  a <- checkTy' illegal r
+  a <- checkTy' illegalTy r
   checkReturnType x l ret a 0
   pure a
   where
-    illegal = stopAfter $ invalidHole r THPConstructor
+    illegalTy = stopAfter $ invalidHole r THPConstructor
+
+-- | Elaborate a constructor declaration.
+checkCtr :: Lvl -> R.Constructor -> M (Constructor, Name, BegPos)
+checkCtr parentLvl r@(R.Constructor x a beg) = do
+  me <- lookupTm x
+  case me of
+    Nothing -> do
+      l <- getNextConstructor
+      a <- checkCtrTy x parentLvl a
+      pure (Constructor l a, x, beg)
+    Just entry  -> case entry of
+      TopLevelEntry _ _ prev      -> err prev
+      ConstructorEntry _ _ _ prev -> err prev
+      _                           -> devError "previous declaration was not a top-level binding"
+  where
+    err prev = stopAfter $ multipleDecls r x prev
+
+----------------------------------------
+-- Data type declarations
+
+checkDataDeclScope :: R.DataDecl -> M ()
+checkDataDeclScope r@(R.DD x _ _ _ _) = do
+  me <- lookupTy x
+  case me of
+    Nothing     -> pure ()
+    Just entry  -> case entry of
+      DataEntry _ _ prev  -> stopAfter $ multipleDecls r x prev
+      _                   -> devError "previous declaration was not a top-level binding"
+
+-- | Bind a new data type.
+withDataType :: MonadElab m => TyName -> Int -> BegPos -> m a -> m a
+withDataType x c beg = withElabCxt bindDataType
+  where
+    bindDataType ElabCxt {..} =
+      let TopLevelCxt {..} = topLevelCxt
+          Namespaces {..} = names
+          PrintCxt {..} = printInfo
+          types' = M.insert x (DataEntry nextTypeDecl c beg) types
+          nextTypeDecl' = nextTypeDecl + 1
+          typeNames' = typeNames :> x
+      in
+      let topLevelCxt = TopLevelCxt {nextTypeDecl = nextTypeDecl', ..}
+          names = Namespaces {types = types', ..}
+          printInfo = PrintCxt {typeNames = typeNames', ..}
+      in ElabCxt {..}
+
+-- | Bind a new data constructor.
+withConstructor :: MonadElab m => Name -> VTy -> Int -> BegPos -> m a -> m a
+withConstructor x va c beg = withElabCxt bindConstructor
+  where
+    bindConstructor ElabCxt {..} =
+      let TopLevelCxt {..} = topLevelCxt
+          Namespaces {..} = names
+          PrintCxt {..} = printInfo
+          terms' = M.insert x (ConstructorEntry nextConstructor va c beg) terms
+          nextConstructor' = nextConstructor + 1
+          constructorNames' = constructorNames :> x
+      in
+      let topLevelCxt = TopLevelCxt {nextConstructor = nextConstructor', ..}
+          names = Namespaces {terms = terms', ..}
+          printInfo = PrintCxt {constructorNames = constructorNames', ..}
+      in ElabCxt {..}
+
+-- | Add universal quantifiers to a constructors type, which binds
+-- the type parameters of its parent data type.
+addForAlls :: Ty -> M Ty
+addForAlls a = do
+  xs <- tyVars . printInfo <$> getElabCxt
+  pure $ foldl (\a x -> ForAll x a) a xs
+
+-- | Elaborate a data type declaration, creating new bindings
+-- for the type and its constructors.
+withDataDecl :: MonadElab m => R.DataDecl -> (DataDecl -> m a) -> m a
+withDataDecl r@(R.DD x xs cs beg _) f = do
+  checkDataDeclScope r
+  l <- getNextTypeDecl
+  let c = length xs
+  withDataType x c beg $
+    withTyVars xs $
+      goConstructors l c [] cs
+  where
+    goConstructors l c cs = \case
+      []        -> do
+        let dd = DD l xs (reverse cs)
+        atTopLevel $ f dd
+      r : rs  -> do
+        (ctr, x, beg) <- checkCtr l r
+        let Constructor _ a = ctr
+        a <- addForAlls a
+        va <- evalTy [] a
+        withConstructor x va c beg $
+          goConstructors l c (ctr : cs) rs
+
+----------------------------------------
+
+-- | Elaborate a type declaration.
+withTypeDecl :: MonadElab m => R.TypeDecl -> (TypeDecl -> m a) -> m a
+withTypeDecl r f = case r of
+  R.DataDecl dd -> withDataDecl dd (f . DataDecl)
+
+------------------------------------------------------------
+-- Programs
+
+-- | Elaborate a program.

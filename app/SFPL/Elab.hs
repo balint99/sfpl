@@ -243,3 +243,20 @@ elabTestPat = elabTest pat inferPat printPat
       in render $
              pretty pcxt p <+> colon <+> pretty (tcxt', metas) va
           $$ nest 2 d
+
+elabTestCtr l xs = elabTest constructor elabCtr printCtr
+  where
+    elabCtr r = withTyVars xs $ do
+      (c, _, _) <- checkCtr l r
+      cxt <- printInfo <$> getElabCxt
+      pure (c, cxt)
+    printCtr (ctr, PrintCxt xs ts cs _ _) _ _ =
+      let ccxt = ctrPCxt xs (reverse ts) (reverse cs)
+      in show ctr
+
+elabTestDataDecl = elabTest dataDecl elabDataDecl printDataDecl
+  where
+    elabDataDecl r = withDataDecl r (\dd -> printInfo <$> getElabCxt >>= \cxt -> pure (dd, cxt))
+    printDataDecl (dd, PrintCxt _ ts cs _ _) _ _ =
+      let ddcxt = ddPCxt (reverse ts) (reverse cs)
+      in showPretty ddcxt dd
