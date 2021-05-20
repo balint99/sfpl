@@ -6,6 +6,7 @@ module SFPL.Eval.Types where
 import Control.Monad.Reader
 import Data.Array.IArray hiding (Ix)
 import SFPL.Base
+import SFPL.Elab.Metacontext (SomeMetas)
 import SFPL.Syntax.Core.Types (Ty, Tm)
 
 ------------------------------------------------------------
@@ -135,6 +136,11 @@ type EvalCxt = (TopLevel, CtrNames)
 --
 -- @since 1.0.0
 type EvalError = String
+
+-- | Type evaluation monad.
+--
+-- @since 1.0.0
+type EvalT = (->) SomeMetas
 
 -- | Pure evaluation monad.
 --

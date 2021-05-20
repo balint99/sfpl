@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleInstances, LambdaCase, MultiParamTypeClasses #-}
 
 module SFPL.Eval.Internal where
 
@@ -14,6 +14,7 @@ import SFPL.Eval.Types
 import SFPL.Eval.Instances
 import SFPL.Syntax.Core
 import SFPL.Utils
+import Text.PrettyPrint (Doc)
 
 ----------------------------------------
 -- Operator precedence
@@ -27,17 +28,17 @@ infixl 5 |>
 -- Types
 
 -- | Type closure application.
-($$$) :: MonadMeta m => TClosure -> VTy -> m VTy
+($$$) :: TClosure -> VTy -> EvalT VTy
 TClosure env a $$$ vb = evalTy (env :> vb) a
 
 -- | Apply a metavariable solution to actual parameters.
-applyMeta :: MonadMeta m => Ty -> VTSpine -> m VTy
+applyMeta :: Ty -> VTSpine -> EvalT VTy
 applyMeta a sp = evalTy sp a
 
 -- | Evaluate a metavariable.
-evalMeta :: MonadMeta m => Metavar -> VTSpine -> m VTy
+evalMeta :: Metavar -> VTSpine -> EvalT VTy
 evalMeta m sp = do
-  (metaSt, _) <- lookupMeta m
+  (metaSt, _) <- getMeta m <$> ask
   case metaSt of
     Solved a  -> applyMeta a sp
     Unsolved  -> pure $ VMeta m sp
@@ -45,7 +46,7 @@ evalMeta m sp = do
 -- | Evaluate a type in the given environment.
 --
 -- @since 1.0.0
-evalTy :: MonadMeta m => TEnv -> Ty -> m VTy
+evalTy :: TEnv -> Ty -> EvalT VTy
 evalTy env = \case
   TyVar i     -> pure $ env !! unIx i
   Data l sp   -> VData l <$> evalTSp env sp
@@ -60,7 +61,7 @@ evalTy env = \case
   ForAll x a  -> pure $ VForAll x (TClosure env a)
 
 -- | Evaluate a type spine in the given environment.
-evalTSp :: MonadMeta m => TEnv -> TSpine -> m VTSpine
+evalTSp :: TEnv -> TSpine -> EvalT VTSpine
 evalTSp env = \case
   []      -> pure []
   sp :> a -> (:>) <$> evalTSp env sp <*> evalTy env a
@@ -68,9 +69,9 @@ evalTSp env = \case
 -- | Forcing of metavariables.
 --
 -- @since 1.0.0
-forceTy :: MonadMeta m => VTy -> m VTy
+forceTy :: VTy -> EvalT VTy
 forceTy = \case
-  va@(VMeta m sp) -> do (metaSt, _) <- lookupMeta m
+  va@(VMeta m sp) -> do (metaSt, _) <- getMeta m <$> ask
                         case metaSt of
                           Solved a  -> forceTy =<< applyMeta a sp
                           Unsolved  -> pure va
@@ -79,7 +80,7 @@ forceTy = \case
 -- | Quote a type value.
 --
 -- @since 1.0.0
-quoteTy :: MonadMeta m => Lvl -> VTy -> m Ty
+quoteTy :: Lvl -> VTy -> EvalT Ty
 quoteTy n va = forceTy va >>= \case
   VTyVar l    -> pure $ TyVar (lvl2Ix n l)
   VData l sp  -> Data l <$> quoteTSp n sp
@@ -93,16 +94,25 @@ quoteTy n va = forceTy va >>= \case
   VForAll x b -> ForAll x <$> (quoteTy (n + 1) =<< b $$$ VTyVar n)
 
 -- | Quote a type value spine.
-quoteTSp :: MonadMeta m => Lvl -> VTSpine -> m TSpine
+quoteTSp :: Lvl -> VTSpine -> EvalT TSpine
 quoteTSp n = \case
   []      -> pure []
   sp :> a -> (:>) <$> quoteTSp n sp <*> quoteTy n a
 
--- | Show a type value using the given information context.
+-- | Information context for type values.
 --
 -- @since 1.0.0
-showVTy :: MonadMeta m => TyPCxt -> VTy -> m String
-showVTy cxt@(xs, _, _) va = showPretty cxt <$> quoteTy (Lvl $ length xs) va
+type VTyPCxt = (TyPCxt, SomeMetas)
+
+-- | Pretty-print a type value, using the given information context.
+--
+-- @since 1.0.0
+prettyVTy :: Prec -> VTyPCxt -> VTy -> Doc
+prettyVTy p (tcxt@(xs, _, _), metas) va = prettyPrec p tcxt $ quoteTy (Lvl $ length xs) va metas
+
+-- | @since 1.0.0
+instance Pretty VTyPCxt VTy where
+  prettyPrec = prettyVTy
 
 ------------------------------------------------------------
 -- Terms

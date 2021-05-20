@@ -13,10 +13,13 @@ import Text.PrettyPrint
 ----------------------------------------
 -- Terms
 
+-- | Information context for term values.
+type ValPCxt = CtrNames
+
 prettyChar :: Char -> Doc
 prettyChar c = text $ showLitChar c ""
 
-prettyCons :: CtrNames -> VSpine -> Doc
+prettyCons :: ValPCxt -> VSpine -> Doc
 prettyCons ctrs ([] :> hd :> tl) = case hd of
   VChar _ -> doubleQuotes . hcat . map (prettyChar . toChar) $ hd : toList tl
   _       -> brackets . hjoin ", " . map (prettyVal LowP ctrs) $ hd : toList tl
@@ -38,12 +41,12 @@ prettyCons ctrs ([] :> hd :> tl) = case hd of
           | otherwise   = devError "encountered non-list constructor while printing list"
 prettyCons _ _ = devError "cons constructor doesn't have 2 fields"
 
-prettyCtr :: Prec -> CtrNames -> Name -> VSpine -> Doc
+prettyCtr :: Prec -> ValPCxt -> Name -> VSpine -> Doc
 prettyCtr p ctrs x = \case
   []        -> text x
   sp :> vt  -> par p AppP $ prettyCtr AppP ctrs x sp <+> prettyVal AtomP ctrs vt
 
-prettyVCtr :: Prec -> CtrNames -> Name -> VSpine -> Doc
+prettyVCtr :: Prec -> ValPCxt -> Name -> VSpine -> Doc
 prettyVCtr p ctrs x sp
   | x == dsNil  = brackets empty
   | x == dsCons = prettyCons ctrs sp
@@ -52,7 +55,7 @@ prettyVCtr p ctrs x sp
 -- | Pretty-print a term value.
 --
 -- @since 1.0.0
-prettyVal :: Prec -> CtrNames -> Val -> Doc
+prettyVal :: Prec -> ValPCxt -> Val -> Doc
 prettyVal p ctrs = \case
   VLam{}      -> text "<function>"
   VInt n      -> integer n
