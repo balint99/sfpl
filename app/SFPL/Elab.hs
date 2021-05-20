@@ -114,6 +114,8 @@ instance MonadElab Elab where
     put st
     pure $ '?' : x ++ show n
 
+forall x = VForAll x . TClosure []
+
 initCxt = ElabCxt
   { topLevelCxt = TopLevelCxt 4 7 1
   , names = Namespaces (M.fromList $ [ ("maybe"
@@ -131,12 +133,12 @@ initCxt = ElabCxt
                                      ])
                        (M.fromList $ [ ( "nothing"
                                        , ConstructorEntry 0
-                                           (Data 0 [0]) ["a"]
+                                           (forall "a" $ Data 0 [0]) 1
                                            (SourcePos "<stdin>" 2 4)
                                        )
                                      , ( "just"
                                        , ConstructorEntry 1
-                                           (Fun 0 (Data 0 [0])) ["a"]
+                                           (forall "a" $ Fun 0 (Data 0 [0])) 1
                                            (SourcePos "<stdin>" 3 4)
                                        )
                                      , ( "id"
@@ -146,28 +148,28 @@ initCxt = ElabCxt
                                        )
                                      , ( "T"
                                        , ConstructorEntry 2
-                                           (ForAll "a" $ ForAll "b" $
-                                             Fun (Tuple [1, 0]) (Data 1 [])) []
+                                           (forall "a" $ ForAll "b" $
+                                             Fun (Tuple [1, 0]) (Data 1 [])) 0
                                            (SourcePos "<stdin>" 9 4)
                                        )
                                      , ( "nil"
                                        , ConstructorEntry 3
-                                           (Data 2 [0]) ["a"]
+                                           (forall "a" $ Data 2 [0]) 1
                                            (SourcePos "<stdin>" 12 4)
                                        )
                                      , ( "cons"
                                        , ConstructorEntry 4
-                                           (Fun 0 $ Fun (Data 2 [0]) $ Data 2 [0]) ["a"]
+                                           (forall "a" $ Fun 0 $ Fun (Data 2 [0]) $ Data 2 [0]) 1
                                            (SourcePos "<stdin>" 13 4)
                                        )
                                      , ( "left"
                                        , ConstructorEntry 5
-                                           (Fun 1 $ Data 3 [0, 1]) ["a", "b"]
+                                           (forall "a" $ ForAll "b" $ Fun 1 $ Data 3 [0, 1]) 2
                                            (SourcePos "<stdin>" 16 4)
                                        )
                                      , ( "right"
                                        , ConstructorEntry 6
-                                           (Fun 0 $ Data 3 [0, 1]) ["a", "b"]
+                                           (forall "a" $ ForAll "b" $ Fun 0 $ Data 3 [0, 1]) 2
                                            (SourcePos "<stdin>" 17 4)
                                        )  
                                      ])

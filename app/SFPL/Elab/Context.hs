@@ -51,11 +51,9 @@ data TmEntry
     -- and the source position where it is defined.
     TopLevelEntry Lvl VTy BegPos
   | -- | A data constructor, storing its top-level identifier, type,
-    -- the names of the type parameters of the data type it belongs to,
+    -- the number of type parameters its parent type has,
     -- and the source position where it is defined.
-    -- The type is not evaluated, because we need to apply the constructor to
-    -- the appropriate number of type parameters when pattern matching on it.
-    ConstructorEntry Lvl Ty [TyName] BegPos
+    ConstructorEntry Lvl VTy Int BegPos
   | -- | A variable, storing the size of the context when it was bound and
     -- its type.
     VarEntry Lvl VTy

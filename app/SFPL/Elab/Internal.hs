@@ -239,14 +239,15 @@ inferTuplePat xs = do
         pure (va : vas, Left (x, va) : bindings)
     tupleMetaNames = [replicate c x | c <- [1 ..], x <- ['a' .. 'z']]
 
-insertForCtr :: Ty -> [TyName] -> M VTy
-insertForCtr a xs = createMetas [] xs >>= \ms -> evalTy ms a
-  where
-    createMetas ms = \case
-      []      -> pure ms
-      x : xs  -> do
-        m <- evalTy' =<< freshNamedMeta x
-        createMetas (ms :> m) xs
+insertForCtr :: VTy -> Int -> M VTy
+insertForCtr va = \case
+  0 -> pure va
+  c -> case va of
+    VForAll x cl  -> do
+      m <- evalTy' =<< freshNamedMeta x
+      vb <- cl $$$ m
+      insertForCtr vb (c - 1)
+    _             -> devError "can't insert for constructor: not a forall type"
 
 inferCtrPat :: R.Pattern -> Name -> R.CtrArgs -> M (Pattern, VTy, PatternBindings)
 inferCtrPat r x args = do
@@ -254,8 +255,8 @@ inferCtrPat r x args = do
   case me of
     Nothing     -> scopeError
     Just entry  -> case entry of
-      ConstructorEntry l a xs _ -> do
-        va <- insertForCtr a xs
+      ConstructorEntry l va c _ -> do
+        va <- insertForCtr va c
         (va, bindings) <- go args va
         let args = map (fst +++ id) bindings
         pure (PCtr l args, va, bindings)
