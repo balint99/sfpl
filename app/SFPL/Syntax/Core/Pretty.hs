@@ -36,9 +36,13 @@ tyBind :: TyName -> TyPCxt -> TyPCxt
 tyBind x (xs, ms, ts) = (xs :> x, ms, ts)
 
 prettyData :: Bool -> Prec -> TyPCxt -> TyName -> TSpine -> Doc
-prettyData o p cxt x = \case
-  []      -> text x
-  sp :> a -> par p AppP $ prettyData o AppP cxt x sp <+> prettyTy o AtomP cxt a
+prettyData o p cxt x sp
+  | x == dsList = case sp of
+    [a] -> brackets $ prettyTy o LowP cxt a
+    _   -> devError "list type doesn't have 1 type parameter"
+  | otherwise   = case sp of
+    []      -> text x
+    sp :> a -> par p AppP $ prettyData o AppP cxt x sp <+> prettyTy o AtomP cxt a
 
 prettyMetavar :: Metavar -> Doc
 prettyMetavar (Metavar m) = char '?' <> int m
@@ -106,7 +110,14 @@ patPCxt :: [Name] -> PatPCxt
 patPCxt = arr
 
 prettyCtr :: Prec -> Name -> CtrArgs -> Doc
-prettyCtr = Raw.prettyCtrPat
+prettyCtr p x args
+  | x == dsNil  = case args of
+    []  -> brackets empty
+    _   -> devError "nil constructor doesn't have 0 arguments"
+  | x == dsCons = case args of
+    [Left x, Left y]  -> text x <+> text "::" <+> text y
+    _                 -> devError "cons constructor doesn't have 2 explicit arguments"
+  | otherwise   = Raw.prettyCtrPat p x args
 
 -- | Pretty-print a pattern in the given precedence context, using the given
 -- information context.
