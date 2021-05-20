@@ -6,8 +6,9 @@ module SFPL.Elab.Error.Types where
 import SFPL.Base
 import SFPL.Elab.Context
 import SFPL.Elab.Metacontext
-import SFPL.Syntax.Raw.Types
 import SFPL.Eval.Types
+import SFPL.Syntax.Raw.Types
+import SFPL.Syntax.Raw.Instances
 
 -- | Any kind of elaboration error.
 --
@@ -22,6 +23,9 @@ data ElabError = ElabError
   , -- | Optional additional error items providing details about the error.
     elabErrorItems :: [ElabErrorItem]
   }
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
 
 -- | The type of an elaboration error with further details.
 --
@@ -58,6 +62,9 @@ data ElabErrorType
   | -- | A term hole was encountered.
     -- Includes the expected type of the hole.
     HoleError VTy
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
 
 -- | The types of syntactic elements which can generate a scope error.
 --
@@ -69,6 +76,9 @@ data SyntacticCategory
     SCVariable
   | -- | A data constructor.
     SCConstructor
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
 
 -- | Get the name of a syntactic category.
 --
@@ -88,6 +98,9 @@ data MalformedTypeErrorReason
   | -- | A data type was not supplied the appropriate number of type parameters.
     -- Includes the name of the type, expected and actual number of parameters.
     BadDataApplication TyName Int Int
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
 
 -- | The place of a type signature when type holes are not allowed.
 --
@@ -97,6 +110,9 @@ data TypeHolePlace
     THPTopLevelDef
   | -- | Type signature of a data constructor.
     THPConstructor
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
 
 -- | The reason why a unification failed.
 --
@@ -110,6 +126,9 @@ data UnificationErrorReason
     EscapingVariable Ix
   | -- | The metavariable solved for occurred recursively in the equation.
     Occurs Metavar
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
 
 -- | The type of an overloaded entity.
 --
@@ -119,6 +138,9 @@ data OverloadType
     OTOperator String
   | -- | A built-in function with its name.
     OTFunction Name
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
 
 -- | Additional error items providing further information regarding an error.
 --
@@ -126,3 +148,6 @@ data OverloadType
 data ElabErrorItem
   = -- | A list of local bindings and their types.
     Bindings
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
