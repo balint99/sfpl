@@ -233,19 +233,19 @@ prettyTopLevelDef p (TL x a t _ _) =
 prettyConstructor :: Prec -> Constructor -> Doc
 prettyConstructor p (Constructor x a _) = par p LowP $ prettyTySig x a
 
-prettyConstructors :: [Constructor] -> Doc
-prettyConstructors = \case
-  []      -> empty
-  c : cs  -> space <> (char '=' <+> prettyConstructor LowP c
-                    $$ vcat (map (\c -> char '|' <+> prettyConstructor LowP c) cs))
+prettyConstructors :: Constructor -> [Constructor] -> Doc
+prettyConstructors c cs =
+    char '=' <+> prettyConstructor LowP c
+ $$ vcat (map (\c -> char '|' <+> prettyConstructor LowP c) cs)
 
 -- | Pretty-print a data type declaration.
 --
 -- @since 1.0.0
 prettyDataDecl :: Prec -> DataDecl -> Doc
-prettyDataDecl p (DD x xs cs _ _) =
-  par p LowP $ text "data" <+> text x <+> hsep (map text xs)
-            <> prettyConstructors cs <> char ';'
+prettyDataDecl p (DD x xs cs _ _) = par p LowP $ case cs of
+  []      -> text "data" <+> text x <+> hsep (map text xs) <> char ';'
+  c : cs  -> text "data" <+> text x <+> hsep (map text xs)
+          $$ nest 2 (prettyConstructors c cs <> char ';')
 
 -- | Pretty-print a type declaration.
 --

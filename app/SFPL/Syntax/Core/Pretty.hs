@@ -388,21 +388,21 @@ type DDPCxt = (Array Lvl TyName, Array Lvl Name)
 ddPCxt :: [TyName] -> [Name] -> DDPCxt
 ddPCxt ts cs = (arr ts, arr cs)
 
-prettyConstructors :: CtrPCxt -> [Constructor] -> Doc
-prettyConstructors ccxt = \case
-  []      -> empty
-  c : cs  -> space <> (char '=' <+> prettyConstructor LowP ccxt c
-                    $$ vcat (map (\c -> char '|' <+> prettyConstructor LowP ccxt c) cs))
+prettyConstructors :: CtrPCxt -> Constructor -> [Constructor] -> Doc
+prettyConstructors ccxt c cs =
+    char '=' <+> prettyConstructor LowP ccxt c
+ $$ vcat (map (\c -> char '|' <+> prettyConstructor LowP ccxt c) cs)
 
 -- | Pretty-print a data type declaration.
 --
 -- @since 1.0.0
 prettyDataDecl :: Prec -> DDPCxt -> DataDecl -> Doc
-prettyDataDecl p cxt@(ts, cs) (DD l xs cs') =
-  par p LowP $ text "data" <+> text (ts ! l) <+> hsep (map text xs)
-            <> prettyConstructors ccxt cs' <> char ';'
+prettyDataDecl p cxt@(ts, ctrs) (DD l xs cs) = par p LowP $ case cs of
+  []      -> text "data" <+> text (ts ! l) <+> hsep (map text xs) <> char ';'
+  c : cs  -> text "data" <+> text (ts ! l) <+> hsep (map text xs)
+          $$ nest 2 (prettyConstructors ccxt c cs <> char ';')
   where
-    ccxt = (reverse xs, ts, cs)
+    ccxt = (reverse xs, ts, ctrs)
 
 -- | Information context for printing type declarations:
 -- the names of defined types and data constructors.
