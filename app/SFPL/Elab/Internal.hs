@@ -79,7 +79,7 @@ freshNamedMeta x = do
   x <- freshName x
   freshMeta $ MetaInfo n x
 
--- | Bind a new rigid type variable.
+-- | Bind a new type variable.
 withTyVar :: MonadElab m => TyName -> m a -> m a
 withTyVar x = withElabCxt (bindTyVar x)
   where
@@ -93,6 +93,19 @@ withTyVar x = withElabCxt (bindTyVar x)
       in
       let names = Namespaces {types = types', ..}
           printInfo = PrintCxt {tyVars = tyVars', ..}
+      in ElabCxt {tyEnv = tyEnv', tyLvl = tyLvl', ..}
+
+-- | Bind a new implicit type variable.
+withImplTyVar :: MonadElab m => TyName -> m a -> m a
+withImplTyVar x = withElabCxt (bindImplTyVar x)
+  where
+    bindImplTyVar x ElabCxt {..} =
+      let PrintCxt {..} = printInfo
+          tyVars' = tyVars :> x
+          tyEnv' = tyEnv :> VTyVar tyLvl
+          tyLvl' = tyLvl + 1
+      in
+      let printInfo = PrintCxt {tyVars = tyVars', ..}
       in ElabCxt {tyEnv = tyEnv', tyLvl = tyLvl', ..}
 
 --  Type evaluation
@@ -239,7 +252,7 @@ inferCtrPat r x args = do
           pure (va', Left (x, va) : bindings)
         (Left x , VForAll y cl) -> do
           vb <- enterClosure cl
-          withTyVar y $ do
+          withImplTyVar y $ do
             (va', bindings) <- go args vb
             pure (va', Right y : bindings)
         (Right x, VForAll y cl) -> do

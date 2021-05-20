@@ -143,7 +143,8 @@ initCxt = ElabCxt
                                        )
                                      , ( "T"
                                        , ConstructorEntry 2
-                                           (ForAll "a" $ Fun 0 (Data 1 [])) []
+                                           (ForAll "a" $ ForAll "b" $
+                                             Fun (Tuple [1, 0]) (Data 1 [])) []
                                            (SourcePos "<stdin>" 9 4)
                                        )
                                      , ( "nil"
