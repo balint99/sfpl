@@ -56,7 +56,7 @@ invert n sp = (\(dom, ren) -> PartialRenaming dom n ren) <$> go sp
       []        -> pure (0, M.empty)
       sp :> va  -> do
         (dom, ren) <- go sp
-        case va of
+        forceTy va >>= \case
           VTyVar l | not (M.member l ren) -> pure (dom + 1, M.insert l dom ren)
           _                               -> throwError InvalidSpine
 
