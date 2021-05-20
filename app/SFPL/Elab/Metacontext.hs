@@ -22,6 +22,7 @@ import qualified Data.HashMap.Lazy as M
 import GHC.Stack
 import SFPL.Base
 import SFPL.Syntax.Core.Types
+import SFPL.Syntax.Core.Instances
 import SFPL.Utils
 
 ------------------------------------------------------------
@@ -35,6 +36,9 @@ data MetaState
     Solved Ty
   | -- | An unsolved meta.
     Unsolved
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
 
 -- | Information about a metavariable.
 --
@@ -45,6 +49,9 @@ data MetaInfo = MetaInfo
   , -- | The metavariable's name.
     metaName :: TyName
   }
+  deriving
+    ( Show -- ^ @since 1.0.0
+    )
 
 -- | An entry in the metacontext.
 --
