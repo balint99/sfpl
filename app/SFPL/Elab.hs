@@ -40,6 +40,8 @@ data ElabSt = ElabSt
     nextMeta :: Metavar
   , -- | Registered elaboration errors.
     elabErrors :: [ElabError]
+  , -- | Are there any holes registered?
+    anyHole :: Bool
   , -- | A map which contains for each base name the next numeral that is
     -- going to be used for fresh metavariable creation. A missing name implies
     -- that a metavariable with that base name has not yet been created.
@@ -94,9 +96,14 @@ instance MonadElab Elab where
   registerElabError err = do
     st <- get
     let ElabSt {..} = st
-    let elabErrors' = err : elabErrors
-        st = ElabSt {elabErrors = elabErrors', ..}
+        elabErrors' = err : elabErrors
+        anyHole' = case elabErrorType err of
+          HoleError{} -> True
+          _           -> False
+    let st = ElabSt {elabErrors = elabErrors', anyHole = anyHole', ..}
     put st
+
+  isHoleRegistered = anyHole <$> get
 
   throwElabErrors = do
     st <- get
@@ -108,9 +115,9 @@ instance MonadElab Elab where
   freshName x = do
     st <- get
     let ElabSt {..} = st
-    let n = M.findWithDefault 0 x metaCounters
+        n = M.findWithDefault 0 x metaCounters
         metaCounters' = M.insert x (n + 1) metaCounters
-        st = ElabSt {metaCounters = metaCounters', ..}
+    let st = ElabSt {metaCounters = metaCounters', ..}
     put st
     pure $ '?' : x ++ show n
 
@@ -184,6 +191,7 @@ emptySt = ElabSt
   { metaEntries = M.empty
   , nextMeta = 0
   , elabErrors = []
+  , anyHole = False
   , metaCounters = M.empty
   }
 
@@ -260,3 +268,18 @@ elabTestDataDecl = elabTest dataDecl elabDataDecl printDataDecl
     printDataDecl (dd, PrintCxt _ ts cs _ _) _ _ =
       let ddcxt = ddPCxt (reverse ts) (reverse cs)
       in showPretty ddcxt dd
+
+elabTestTopLevelDef = elabTest topLevelDef elabTopLevelDef printTopLevelDef
+  where
+    elabTopLevelDef r = withTopLevelDef r (\tl -> printInfo <$> getElabCxt >>= \cxt -> pure (tl, cxt))
+    printTopLevelDef (tl, PrintCxt _ ts cs _ tls) _ _ =
+      let tlcxt = tlPCxt tls [] ts cs
+      in showPretty tlcxt tl
+
+elabTestProgram = elabTest program elabProgram printProgram
+  where
+    elabProgram = checkProgram
+    printProgram (prog, ElabCxt {..}) _ _ =
+      let PrintCxt _ ts cs _ tls = printInfo
+          pcxt = progPCxt tls [] ts cs
+      in showPretty pcxt prog

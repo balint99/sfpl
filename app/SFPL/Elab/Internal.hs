@@ -337,13 +337,47 @@ inferPat r = case r of
 
 -- | Check that a term has the given type.
 checkTm :: R.Tm -> VTy -> M Tm
-checkTm r va = forceTy va >>= \va -> case (r, va) of
-  _ -> undefined
+checkTm r vexp = case (r, vexp) of -- vexp can't contain metavariables
+  (R.Hole _, va)  -> Hole <$ newHole r va
+  _ -> do
+    (t, vact) <- {- insert -} inferTm r
+    unify r vexp vact
+    pure t
 
 -- | Infer the type of a term.
 inferTm :: R.Tm -> M (Tm, VTy)
 inferTm r = case r of
-  _ -> undefined
+  R.Iden x _        -> undefined
+  R.Lam bs t _      -> undefined
+  R.App t u         -> undefined
+  R.AppI t as _     -> undefined
+  R.Let bs t _      -> undefined
+  R.TyAnn t a       -> do
+    a <- checkTy a
+    va <- evalTy' a
+    t <- checkTm t va
+    pure (t, va)
+  R.Hole _          -> do
+    va <- freshNamedMeta' "t"
+    (Hole, va) <$ newHole r va
+  R.IntLit n _ _    -> pure (IntLit n, VTInt)
+  R.FloatLit n _ _  -> pure (FloatLit n, VTFloat)
+  R.CharLit c _ _   -> pure (CharLit c, VTChar)
+  R.StringLit s _ _ -> undefined
+  R.Tup ts _ _      -> case ts of
+    [t] -> inferTm t
+    ts  -> (Tup *** VTTuple) . unzip <$> (inferTm <$$> ts)
+  R.ListLit ts _ _  -> undefined
+  R.UnOp op t _     -> undefined
+  R.BinOp op t u    -> undefined
+  R.NullFunc f _ _  -> undefined
+  R.UnFunc f t _    -> undefined
+  R.BinFunc f t u _ -> undefined
+  R.If t u v _      -> undefined
+  R.Split t xs u _  -> undefined
+  R.Switch bs _ _   -> undefined
+  R.Case t bs _ _   -> undefined
+  R.Do bs t _       -> undefined
 
 ----------------------------------------
 -- Top-level definitions
@@ -386,8 +420,10 @@ withTopLevelDef r@(R.TL x a t beg _) f = do
   va <- evalTy [] a
   withTopLevel x va beg $ do
     t <- checkTm t va
-    let tl = TL x a t
-    f tl
+    b <- isHoleRegistered
+    if b
+      then throwElabErrors
+      else f (TL x a t)
   where
     illegalTy = stopAfter $ invalidHole a THPTopLevelDef
 
@@ -510,9 +546,7 @@ withDataDecl r@(R.DD x xs cs beg _) f = do
       goConstructors l c [] cs
   where
     goConstructors l c cs = \case
-      []        -> do
-        let dd = DD l xs (reverse cs)
-        atTopLevel $ f dd
+      []      -> atTopLevel $ f (DD l xs (reverse cs))
       r : rs  -> do
         (ctr, x, beg) <- checkCtr l r
         let Constructor _ a = ctr
@@ -532,3 +566,11 @@ withTypeDecl r f = case r of
 -- Programs
 
 -- | Elaborate a program.
+checkProgram :: R.Program -> M (Program, ElabCxt)
+checkProgram = go pure
+  where
+    go f = \case
+      []      -> pair (f []) getElabCxt
+      d : ds  -> case d of
+        Left td   -> withTypeDecl td $ \td -> go (\p -> f (Left td : p)) ds
+        Right tl  -> withTopLevelDef tl $ \tl -> go (\p -> f (Right tl : p)) ds
