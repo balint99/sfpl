@@ -15,7 +15,7 @@ import qualified SFPL.Elab.Unification as U
 import qualified SFPL.Eval as E
 import SFPL.Eval.Types
 import SFPL.Syntax.Core.Types
-import SFPL.Syntax.Raw.Types (Raw (..), BegPos)
+import SFPL.Syntax.Raw.Types (Raw (..), BegPos, EndPos)
 import qualified SFPL.Syntax.Raw.Types as R
 import SFPL.Utils
 
@@ -212,6 +212,7 @@ checkTApp' h r r' x as = do
 checkTApp :: MonadElab m => m Ty -> R.Ty -> R.Ty -> R.TSpine -> m Ty
 checkTApp h r a as = case a of
   r'@(R.TyIden x _) -> checkTApp' h r r' x as
+  r'@(R.List a _ _) -> checkTApp' h r r' dsList (a : as)
   _                 -> illegal
   where
     illegal = stopAfter $ badTyApp r
@@ -259,6 +260,9 @@ checkPat r vexp = case r of
     unify r vexp vact
     pure (pat, bindings)
 
+tupleMetaNames :: [String]
+tupleMetaNames = [replicate c x | c <- [1 ..], x <- ['a' .. 'z']]
+
 inferTuplePat :: [Name] -> M (Pattern, VTy, PatternBindings)
 inferTuplePat xs = do
   (vas, bindings) <- go xs tupleMetaNames
@@ -270,7 +274,6 @@ inferTuplePat xs = do
         va <- freshNamedMeta' m
         (vas, bindings) <- go xs ms
         pure (va : vas, Left (x, va) : bindings)
-    tupleMetaNames = [replicate c x | c <- [1 ..], x <- ['a' .. 'z']]
 
 insertForCtr :: VTy -> Int -> M VTy
 insertForCtr va = \case
@@ -335,14 +338,32 @@ inferPat r = case r of
 ------------------------------------------------------------
 -- Terms
 
+checkTup :: [R.Tm] -> [VTy] -> M Tm
+checkTup ts vas = Tup <$> go ts vas
+  where
+    go ts vas = case (ts, vas) of
+      ([]    , []      )  -> pure []
+      (t : ts, va : vas)  -> (:) <$> checkTm t va <*> go ts vas
+      _                   -> devError "bad size for tuple"
+
 -- | Check that a term has the given type.
 checkTm :: R.Tm -> VTy -> M Tm
 checkTm r vexp = case (r, vexp) of -- vexp can't contain metavariables
-  (R.Hole _, va)  -> Hole <$ newHole r va
+  (R.Hole _    , va         ) -> Hole <$ newHole r va
+  (R.Tup ts _ _, VTTuple vas) | length ts == length vas -> checkTup ts vas
   _ -> do
     (t, vact) <- {- insert -} inferTm r
     unify r vexp vact
     pure t
+
+inferTup :: BegPos -> EndPos -> [R.Tm] -> M (Tm, VTy)
+inferTup beg end = \case
+  [t] -> inferTm t
+  ts  -> do
+    vas <- freshNamedMeta' <$$> zipWith (flip const) ts tupleMetaNames
+    let va = VTTuple vas
+    t <- checkTm (R.Tup ts beg end) va
+    pure (t, va)
 
 -- | Infer the type of a term.
 inferTm :: R.Tm -> M (Tm, VTy)
@@ -364,9 +385,7 @@ inferTm r = case r of
   R.FloatLit n _ _  -> pure (FloatLit n, VTFloat)
   R.CharLit c _ _   -> pure (CharLit c, VTChar)
   R.StringLit s _ _ -> undefined
-  R.Tup ts _ _      -> case ts of
-    [t] -> inferTm t
-    ts  -> (Tup *** VTTuple) . unzip <$> (inferTm <$$> ts)
+  R.Tup ts beg end  -> inferTup beg end ts
   R.ListLit ts _ _  -> undefined
   R.UnOp op t _     -> undefined
   R.BinOp op t u    -> undefined
@@ -420,7 +439,7 @@ withTopLevelDef r@(R.TL x a t beg _) f = do
   va <- evalTy [] a
   withTopLevel x va beg $ do
     t <- checkTm t va
-    b <- isHoleRegistered
+    b <- isErrorRegistered
     if b
       then throwElabErrors
       else f (TL x a t)

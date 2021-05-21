@@ -19,8 +19,8 @@ class MonadMeta m => MonadElab m where
   -- | Register an elaboration error.
   registerElabError :: ElabError -> m ()
   
-  -- | Query if there are registered term holes.
-  isHoleRegistered :: m Bool
+  -- | Query if there are any registered errors.
+  isErrorRegistered :: m Bool
   
   -- | Throw the registered elaboration errors.
   -- Precondition: there is at least 1 registered error.

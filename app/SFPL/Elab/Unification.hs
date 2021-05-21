@@ -100,7 +100,7 @@ unify' n va vb = pair (forceTy va) (forceTy vb) >>= \case
   (VTInt       , VTInt         )  -> pure ()
   (VTFloat     , VTFloat       )  -> pure ()
   (VTChar      , VTChar        )  -> pure ()
-  (VTTuple vas , VTTuple vbs   )  -> unifyList n vas vbs
+  (VTTuple vas , VTTuple vbs   )  | length vas == length vbs -> unifyTup n vas vbs
   (VWorld va   , VWorld vb     )  -> unify' n va vb
   (VFun va vb  , VFun va' vb'  )  -> unify' n va va' >> unify' n vb vb'
   (VForAll x cl, VForAll x' cl')  -> bindM2 (unify' (n + 1)) (cl $$$ VTyVar n) (cl' $$$ VTyVar n)
@@ -114,11 +114,11 @@ unifySp n sp sp' = case (sp, sp') of
   (sp :> va, sp' :> va')  -> unifySp n sp sp' >> unify' n va va'
   _                       -> throwError RigidMismatch
 
-unifyList :: Lvl -> [VTy] -> [VTy] -> Unify ()
-unifyList n vas vbs = case (vas, vbs) of
+unifyTup :: Lvl -> [VTy] -> [VTy] -> Unify ()
+unifyTup n vas vbs = case (vas, vbs) of
   ([]      , []      )  -> pure ()
-  (va : vas, vb : vbs)  -> unify' n va vb >> unifyList n vas vbs
-  _                     -> throwError RigidMismatch
+  (va : vas, vb : vbs)  -> unify' n va vb >> unifyTup n vas vbs
+  _                     -> devError "bad size for tuple"
 
 -- | Unify expected and actual types, given the size of
 -- the current type context.

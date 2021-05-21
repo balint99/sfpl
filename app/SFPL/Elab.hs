@@ -40,8 +40,6 @@ data ElabSt = ElabSt
     nextMeta :: Metavar
   , -- | Registered elaboration errors.
     elabErrors :: [ElabError]
-  , -- | Are there any holes registered?
-    anyHole :: Bool
   , -- | A map which contains for each base name the next numeral that is
     -- going to be used for fresh metavariable creation. A missing name implies
     -- that a metavariable with that base name has not yet been created.
@@ -97,13 +95,11 @@ instance MonadElab Elab where
     st <- get
     let ElabSt {..} = st
         elabErrors' = err : elabErrors
-        anyHole' = case elabErrorType err of
-          HoleError{} -> True
-          _           -> False
-    let st = ElabSt {elabErrors = elabErrors', anyHole = anyHole', ..}
+    let st = ElabSt {elabErrors = elabErrors', ..}
     put st
 
-  isHoleRegistered = anyHole <$> get
+  isErrorRegistered = not . null . elabErrors <$> get
+    
 
   throwElabErrors = do
     st <- get
@@ -191,7 +187,6 @@ emptySt = ElabSt
   { metaEntries = M.empty
   , nextMeta = 0
   , elabErrors = []
-  , anyHole = False
   , metaCounters = M.empty
   }
 
