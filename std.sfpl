@@ -1,0 +1,240 @@
+
+--------------------------------------------------------------------------------
+-- SFPL Standard Library
+--------------------------------------------------------------------------------
+
+------------------------------------------------------------
+-- Functions
+
+id : @ a. a -> a
+  = \x. x;
+
+const : @ a b. a -> b -> a
+  = \x _. x;
+
+compose : @ a b c. (b -> c) -> (a -> b) -> a -> c
+  = \f g x. f (g x);
+
+flip : @ a b c. (a -> b -> c) -> b -> a -> c
+  = \f x y. f y x;
+
+app : @ a b. (a -> b) -> a -> b
+  = id;
+
+on : @ a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
+  = \f g x y. f (g x) (g y);
+
+------------------------------------------------------------
+-- Boolean type
+
+data bool
+  = true  : bool
+  | false : bool;
+
+-- Eliminator
+ifThenElse : @ a. bool -> a -> a -> a
+  = \x a b. case x of {
+      true . a;
+      false. b
+    };
+
+-- Conversion from 'int' to 'bool'
+intToBool : int -> bool
+  = \x. case x of {
+      0. false;
+      _. true
+    };
+
+----------------------------------------
+-- Boolean operators
+
+not : bool -> bool
+  = \x. if x then false else true;
+
+and : bool -> bool -> bool
+  = \x y. if x then y else false;
+
+or : bool -> bool -> bool
+  = \x y. if x then true else y;
+
+----------------------------------------
+-- Comparison
+
+eqInt : int -> int -> bool
+  = \x y. intToBool (__eq x y);
+
+eqFloat : float -> float -> bool
+  = \x y. intToBool (__eq x y);
+
+eqChar : char -> char -> bool
+  = \x y. intToBool (__eq x y);
+
+neqInt : int -> int -> bool
+  = \x y. ! (x == y);
+
+neqFloat : float -> float -> bool
+  = \x y. ! (x == y);
+
+neqChar : char -> char -> bool
+  = \x y. ! (x == y);
+
+ltInt : int -> int -> bool
+  = \x y. intToBool (__lt x y);
+
+ltFloat : float -> float -> bool
+  = \x y. intToBool (__lt x y);
+
+ltChar : char -> char -> bool
+  = \x y. intToBool (__lt x y);
+
+lteInt : int -> int -> bool
+  = \x y. x < y || x == y;
+
+lteFloat : float -> float -> bool
+  = \x y. x < y || x == y;
+
+lteChar : char -> char -> bool
+  = \x y. x < y || x == y;
+
+gtInt : int -> int -> bool
+  = \x y. ! (x <= y);
+
+gtFloat : float -> float -> bool
+  = \x y. ! (x <= y);
+
+gtChar : char -> char -> bool
+  = \x y. ! (x <= y);
+
+gteInt : int -> int -> bool
+  = \x y. ! (x < y);
+
+gteFloat : float -> float -> bool
+  = \x y. ! (x < y);
+
+gteChar : char -> char -> bool
+  = \x y. ! (x < y);
+
+------------------------------------------------------------
+-- Numbers
+
+------------------------------------------------------------
+-- Characters
+
+------------------------------------------------------------
+-- IO monad and primitive operations
+
+error : @ a b. a -> b
+  = \x. __error x;
+
+fmap : @ a b. (a -> b) -> % a -> % b
+  = \f m. do x <- m then % f x;
+
+cmap : @ a b. b -> % a -> % b
+  = compose fmap const;
+
+pure : @ a. a -> % a
+  = \x. % x;
+
+ap : @ a b. % (a -> b) -> % a -> % b
+  = \mf ma. do f <- mf;
+               a <- ma
+            then % f a;
+
+seq : @ a b. % a -> % b -> % b
+  = \ma mb. do _ <- ma then mb;
+
+bind : @ a b. % a -> (a -> % b) -> % b
+  = \ma f. do a <- ma then f a;
+
+read : % char
+  = __read;
+
+peek : % char
+  = __peek;
+
+isEOF : % bool
+  = fmap intToBool __is_eof;
+
+putc : char -> % ()
+  = \x. __putc x;
+
+print : @ a. a -> % ()
+  = \x. __print x;
+
+------------------------------------------------------------
+-- List type
+
+data list a
+  = nil  : [a]
+  | cons : a -> [a] -> [a];
+
+----------------------------------------
+-- Basic list functions
+
+head : @ a. [a] -> a
+  = \xs. case xs of {
+      []    . error "head: empty list";
+      x :: _. x
+    };
+
+last : @ a. [a] -> a
+  = \xs. case xs of {
+      []     . error "last: empty list";
+      x :: xs. case xs of {
+        []     . x;
+        _ :: xs. last xs
+      }
+    };
+
+tail : @ a. [a] -> [a]
+  = \xs. case xs of {
+      []     . error "tail: empty list";
+      _ :: xs. xs
+    };
+
+init : @ a. [a] -> [a]
+  = \xs. case xs of {
+      []     . error "init: empty list";
+      x :: xs. case xs of {
+        []. [];     
+        _ . x :: init xs
+      }
+    };
+
+singleton : @ a. a -> [a]
+  = \x. [x];
+
+null : @ a. [a] -> bool
+  = \xs. case xs of {
+      []. true;
+      _ . false
+    };
+
+----------------------------------------
+-- Transformations
+
+map : @ a b. (a -> b) -> [a] -> [b]
+  = \f xs. case xs of {
+      []     . [];
+      x :: xs. f x :: map f xs
+    };
+
+filter : @ a. (a -> bool) -> [a] -> [a]
+  = \p xs. case xs of {
+      []     . [];
+      x :: xs. if p x
+        then x :: filter p xs
+        else filter p xs
+    };
+
+foldr : @ a b. (a -> b -> b) -> b -> [a] -> b
+  = \f z xs. case xs of {
+      []     . z;
+      x :: xs. f x (foldr f z xs)
+    };
+
+foldl : @ a b. (b -> a -> b) -> b -> [a] -> b
+  = \f z xs. case xs of {
+      []     . z;
+      x :: xs. foldl f (f z x) xs
+    };
