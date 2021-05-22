@@ -119,6 +119,15 @@ instance MonadElab Elab where
 
 forall x = VForAll x . TClosure []
 
+emptyCxt = ElabCxt
+  { topLevelCxt = TopLevelCxt 0 0 0
+  , names = Namespaces M.empty M.empty
+  , printInfo = PrintCxt [] [] [] [] []
+  , tyEnv = []
+  , tyLvl = 0
+  , tmLvl = 0
+  }
+
 initCxt = ElabCxt
   { topLevelCxt = TopLevelCxt 4 7 1
   , names = Namespaces (M.fromList $ [ ("maybe"
@@ -195,7 +204,7 @@ instance {-# OVERLAPPING #-} MonadFail Elab where
 
 runElab :: Elab a -> (Either [ElabError] (a, PrintCxt), ElabSt)
 runElab m =
-  runState (runExceptT (runReaderT (pair m (printInfo <$> getElabCxt)) initCxt)) emptySt
+  runState (runExceptT (runReaderT (pair m (printInfo <$> getElabCxt)) emptyCxt)) emptySt
 
 elabTest :: Parser a -> (a -> Elab b) -> (b -> PrintCxt -> SomeMetas -> String) -> IO ()
 elabTest p f g = do

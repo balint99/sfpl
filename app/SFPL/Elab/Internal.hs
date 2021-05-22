@@ -490,8 +490,8 @@ checkDo bs u vb = case bs of
   []              -> checkTm u vb
   (x, ma, t) : bs -> do
     a <- maybe (freshNamedMeta "t") checkTy ma
-    va <- VWorld <$> evalTy' a
-    t <- checkTm t va
+    va <- evalTy' a
+    t <- checkTm t (VWorld va)
     u <- withVar x va $ checkDo bs u vb
     pure $ Bind x a t u
 
@@ -819,8 +819,8 @@ inferDo bs u = case bs of
   []              -> inferTm u
   (x, ma, t) : bs -> do
     a <- maybe (freshNamedMeta "t") checkTy ma
-    va <- VWorld <$> evalTy' a
-    t <- checkTm t va
+    va <- evalTy' a
+    t <- checkTm t (VWorld va)
     (u, vb) <- withVar x va $ inferDo bs u
     pure (Bind x a t u, vb)
 
@@ -1031,17 +1031,17 @@ withDataDecl r@(R.DD x xs cs beg _) f = do
   let c = length xs
   withDataType x c beg $
     withTyVars xs $
-      goConstructors l c [] cs
+      goConstructors l c (f . DD l xs) cs
   where
-    goConstructors l c cs = \case
-      []      -> atTopLevel $ f (DD l xs (reverse cs))
+    goConstructors l c f = \case
+      []      -> atTopLevel $ f []
       r : rs  -> do
         (ctr, x, beg) <- checkCtr l r
         let Constructor _ a = ctr
         a <- addForAlls a
         va <- evalTy [] a
         withConstructor x va c beg $
-          goConstructors l c (ctr : cs) rs
+          goConstructors l c (\cs -> f (ctr : cs)) rs
 
 ----------------------------------------
 
