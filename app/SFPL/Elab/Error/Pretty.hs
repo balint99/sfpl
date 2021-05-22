@@ -28,65 +28,74 @@ prettySourcePos (SourcePos fileName (unPos -> lnum) (unPos -> cnum))
 
 -- | Pretty-print a given type of elaboration error.
 prettyErrorType :: TyPCxt -> ElabCxt -> SomeMetas -> ElabErrorType -> Doc
-prettyErrorType tcxt cxt metas = \case
-  NotInScopeError x cats ->
-    let ns = map scName cats
-        prettyNames (n : ns) = text (capitalize n) <> prettyNames' ns
-          where
-            prettyNames' = \case
-              []      -> empty
-              [n]     -> text " or" <+> text n
-              n : ns  -> comma <+> prettyNames' ns
-    in  prettyNames ns <+> text "not in scope:" <+> quotes (text x)
-  MultipleDeclarationsError x prev ->
-      text "Multiple declarations of" <+> quotes (text x)
-   $$ text "Previous declaration was at" <+> prettySourcePos prev
-  MalformedTypeError a reason ->
-    let explanation = case reason of
-          IllegalApplication        ->
-            text "Only data types may be applied to arguments"
-          BadDataApplication x n n' ->
-              text "Bad number of arguments applied to" <+> quotes (text x)
-           $$ text "Expected" <+> int n <> text ", got" <+> int n'
-    in  text "Malformed type" <+> quotes (pretty' a)
-     $$ explanation
-  InvalidTypeHoleError a place  ->
-    let s = case place of
-          THPTopLevelDef  -> "top-level definitions"
-          THPConstructor  -> "data constructors"
-    in  text "Invalid type hole in" <+> quotes (pretty' a)
-     $$ text "Type holes are not allowed the in type signatures of" <+> text s
-  BadConstructorType x a  ->
-      text "Invalid return type for data constructor" <+> quotes (text x)
-   <> colon <+> quotes (pretty' a)
-   $$ text "The return type of a data constructor must be"
-   $$ nest 2 (text "its parent data type applied to its type parameters")
-  MalformedPatternError pat ->
-    text "Malformed pattern" <+> quotes (pretty' pat)
-  UnificationError vexp vact reason ->
-    let vcxt = (tcxt, metas)
-        explanation = case reason of
-          RigidMismatch       -> empty
-          InvalidSpine        -> empty
-          EscapingVariable i  ->
-            text "Variable" <+> pretty tcxt (TyVar i) <+> text "escapes its scope"
-          Occurs m            ->
-            text (nameOf m) <+> text "occurs recursively in the equation"
-          where
-            nameOf m = metaName . snd $ getMeta m metas
-    in  text "Couldn't match expected type" <+> quotes (pretty vcxt vexp)
-    <+> text "with actual type" <+> quotes (pretty vcxt vact)
-     $$ explanation
-  AmbiguousOverloading otype ->
-    let (s, x) = case otype of
-          OTOperator op -> ("operator", op)
-          OTFunction x  -> ("built-in function", x)
-    in  text "Ambiguous use of" <+> text s <+> quotes (text x)
-  HoleError va ->
-    let vcxt = (tcxt, metas)
-    in  text "Found hole: _ :" <+> pretty vcxt va
+prettyErrorType tcxt cxt metas errorType =
+  let vcxt = (tcxt, metas)
+  in case errorType of
+    NotInScopeError x cats ->
+      let ns = map scName cats
+          prettyNames (n : ns) = text (capitalize n) <> prettyNames' ns
+            where
+              prettyNames' = \case
+                []      -> empty
+                [n]     -> text " or" <+> text n
+                n : ns  -> comma <+> prettyNames' ns
+      in  prettyNames ns <+> text "not in scope:" <+> quotes (text x)
+    MultipleDeclarationsError x prev ->
+        text "Multiple declarations of" <+> quotes (text x)
+     $$ text "Previous declaration was at" <+> prettySourcePos prev
+    MalformedTypeError a reason ->
+      let explanation = case reason of
+            IllegalApplication        ->
+              text "Only data types may be applied to arguments"
+            BadDataApplication x n n' ->
+                text "Bad number of arguments applied to" <+> quotes (text x)
+             $$ text "Expected" <+> int n <> text ", got" <+> int n'
+      in  text "Malformed type" <+> quotes (pretty' a)
+       $$ explanation
+    InvalidTypeHoleError a place ->
+      let s = case place of
+            THPTopLevelDef  -> "top-level definitions"
+            THPConstructor  -> "data constructors"
+      in  text "Invalid type hole in" <+> quotes (pretty' a)
+       $$ text "Type holes are not allowed the in type signatures of" <+> text s
+    BadConstructorType x a ->
+          text "Invalid return type" <+> quotes (pretty' a)
+      <+> text "for data constructor" <+> quotes (text x)
+       $$ text "The return type of a data constructor must be"
+       $$ text "its parent data type applied to its type parameters"
+    MalformedPatternError pat ->
+      text "Malformed pattern" <+> quotes (pretty' pat)
+    UnificationError vexp vact reason ->
+      let explanation = case reason of
+            RigidMismatch       -> empty
+            InvalidSpine        -> empty
+            EscapingVariable i  ->
+              text "Variable" <+> quotes (pretty tcxt (TyVar i)) <+> text "escapes its scope"
+            Occurs m            ->
+              text (nameOf m) <+> text "occurs recursively in the equation"
+            where
+              nameOf m = metaName . snd $ getMeta m metas
+      in  text "Couldn't match expected type" <+> quotes (pretty vcxt vexp)
+      <+> text "with actual type" <+> quotes (pretty vcxt vact)
+       $$ explanation
+    ImplicitApplicationError va b ->
+        text "Cannot apply expression of type" <+> quotes (pretty vcxt va)
+     $$ text "to a type argument" <+> quotes (pretty' b)
+    TypeNotSupportedError ot va ->
+      let (s', x) = otHelper ot
+          s = capitalize s'
+      in text s <+> quotes (text x)
+     <+> text "does not support type" <+> quotes (pretty vcxt va)
+    AmbiguousOverloadingError ot ->
+      let (s, x) = otHelper ot
+      in  text "Ambiguous use of" <+> text s <+> quotes (text x)
+    HoleError va ->
+      text "Found hole: _ :" <+> pretty vcxt va
   where
     capitalize (c : cs) = toUpper c : cs
+    otHelper ot = case ot of
+      OTOperator op -> ("operator", op)
+      OTFunction x  -> ("built-in function", x)
 
 prettyBinding :: VTyPCxt -> (Name, VTy) -> Doc
 prettyBinding vcxt (x, va) = text x <+> char ':' <+> pretty vcxt va

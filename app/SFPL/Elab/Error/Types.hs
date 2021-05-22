@@ -53,12 +53,19 @@ data ElabErrorType
   | -- | A unification error.
     -- Includes the expected and inferred type, and the reason for the failure.
     UnificationError VTy VTy UnificationErrorReason
+  | -- | A function was applied to an implicit type argument.
+    -- Includes the type of the function and the applied type argument.
+    ImplicitApplicationError VTy Ty
   {-| -- | A metavariable is ambiguous.
     -- Includes the identifier of the metavariable.
     AmbiguousMeta Metavar-}
+  | -- | An overloaded operator or built-in function does not support
+    -- the type of one of its operands.
+    -- Includes the type of the overloaded symbol and the unsupported type.
+    TypeNotSupportedError OverloadType VTy
   | -- | An overloaded operator or built-in function is ambiguous.
     -- Includes the type of the overloaded symbol.
-    AmbiguousOverloading OverloadType
+    AmbiguousOverloadingError OverloadType
   | -- | A term hole was encountered.
     -- Includes the expected type of the hole.
     HoleError VTy

@@ -106,7 +106,7 @@ instance MonadElab Elab where
     let errors = elabErrors st
     case errors of
       []  -> devError "no registered elaboration errors"
-      _   -> throwError $ reverse errors
+      _   -> throwError errors
 
   freshName x = do
     st <- get
@@ -174,7 +174,7 @@ initCxt = ElabCxt
                                        , ConstructorEntry 6
                                            (forall "a" $ ForAll "b" $ Fun 0 $ Data 3 [0, 1]) 2
                                            (SourcePos "<stdin>" 17 4)
-                                       )  
+                                       )
                                      ])
   , printInfo = PrintCxt [] ["either", "list", "T", "maybe"]
                             ["right", "left", "cons", "nil", "T", "just", "nothing"] [] ["id"]
@@ -226,26 +226,29 @@ elabTestCtrTy x xs y = elabTest ty elabCtrTy printTy
       let tcxt = tyPCxt (reverse xs) (toAssocList (metaName . snd) metas) (reverse ts)
       in showPretty tcxt a
 
-elabTestPat = elabTest pat inferPat printPat
+elabTestPat = elabTest pat elabPat printPat
   where
-    printPat (p, va, bindings) (PrintCxt xs ts cs _ _) metas =
-      let pcxt = patPCxt (reverse cs)
-          tcxt = tyPCxt xs (toAssocList (metaName . snd) metas) (reverse ts)
-          prettyBinding tcxt = \case
-            Left (x, va)  -> text x <+> colon <+> pretty (tcxt, metas) va
-            Right x       -> text x <+> colon <+> char '*'
-          prettyBindings tcxt = \case
-            []      -> (Text.PrettyPrint.empty, tcxt)
-            b : bs  -> let (d, tcxt') = prettyBindings (newBinding b tcxt) bs
-                       in  (prettyBinding tcxt b $$ d, tcxt')
-            where
-              newBinding b tcxt = case b of
-                Left _  -> tcxt
-                Right x -> tyBind x tcxt
-          (d, tcxt') = prettyBindings tcxt bindings
-      in render $
-             pretty pcxt p <+> colon <+> pretty (tcxt', metas) va
-          $$ nest 2 d
+    elabPat = checkForErrors . inferPat
+    printPat mp (PrintCxt xs ts cs _ _) metas = case mp of
+      Nothing                 -> ""
+      Just (p, va, bindings)  ->
+        let pcxt = patPCxt (reverse cs)
+            tcxt = tyPCxt xs (toAssocList (metaName . snd) metas) (reverse ts)
+            prettyBinding tcxt = \case
+              Left (x, va)  -> text x <+> colon <+> pretty (tcxt, metas) va
+              Right x       -> text (either id id x) <+> colon <+> char '*'
+            prettyBindings tcxt = \case
+              []      -> (Text.PrettyPrint.empty, tcxt)
+              b : bs  -> let (d, tcxt') = prettyBindings (newBinding b tcxt) bs
+                         in  (prettyBinding tcxt b $$ d, tcxt')
+              where
+                newBinding b tcxt = case b of
+                  Left _  -> tcxt
+                  Right x -> tyBind (either id id x) tcxt
+            (d, tcxt') = prettyBindings tcxt bindings
+        in render $
+               pretty pcxt p <+> colon <+> pretty (tcxt', metas) va
+            $$ nest 2 d
 
 elabTestCtr l xs = elabTest constructor elabCtr printCtr
   where
@@ -264,17 +267,27 @@ elabTestDataDecl = elabTest dataDecl elabDataDecl printDataDecl
       let ddcxt = ddPCxt (reverse ts) (reverse cs)
       in showPretty ddcxt dd
 
+elabTestTm = elabTest tm elabTm printTm
+  where
+    elabTm = checkForErrors . inferTm
+    printTm (t, va) (PrintCxt _ ts cs _ tls) metas =
+      let cxt = tmPCxt [] (reverse tls) []
+                       (toAssocList (metaName . snd) metas) (reverse ts) (reverse cs)
+          tcxt = tyPCxt [] (toAssocList (metaName . snd) metas) (reverse ts)
+          vcxt = (tcxt, metas)
+      in render $ pretty cxt t <+> colon <+> pretty vcxt va
+
 elabTestTopLevelDef = elabTest topLevelDef elabTopLevelDef printTopLevelDef
   where
     elabTopLevelDef r = withTopLevelDef r (\tl -> printInfo <$> getElabCxt >>= \cxt -> pure (tl, cxt))
-    printTopLevelDef (tl, PrintCxt _ ts cs _ tls) _ _ =
-      let tlcxt = tlPCxt tls [] ts cs
+    printTopLevelDef (tl, PrintCxt _ ts cs _ tls) _ metas =
+      let tlcxt = tlPCxt (reverse tls) (toAssocList (metaName . snd) metas) (reverse ts) (reverse cs)
       in showPretty tlcxt tl
 
 elabTestProgram = elabTest program elabProgram printProgram
   where
     elabProgram = checkProgram
-    printProgram (prog, ElabCxt {..}) _ _ =
+    printProgram (prog, ElabCxt {..}) _ metas =
       let PrintCxt _ ts cs _ tls = printInfo
-          pcxt = progPCxt tls [] ts cs
+          pcxt = progPCxt (reverse tls) (toAssocList (metaName . snd) metas) (reverse ts) (reverse cs)
       in showPretty pcxt prog

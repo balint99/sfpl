@@ -1,6 +1,8 @@
 
 module SFPL.Elab.Class where
 
+import Control.Monad.Trans
+import Control.Monad.Trans.Maybe
 import SFPL.Base
 import SFPL.Elab.Context
 import SFPL.Elab.Error
@@ -29,3 +31,19 @@ class MonadMeta m => MonadElab m where
   -- | Find a fresh name for a metavariable, using the given
   -- base name.
   freshName :: TyName -> m TyName
+
+-- | @since 1.0.0
+instance MonadMeta m => MonadMeta (MaybeT m) where
+  freshMeta = lift . freshMeta
+  lookupMeta = lift . lookupMeta
+  updateMeta m = lift . updateMeta m
+  getMetas = lift getMetas
+
+-- | @since 1.0.0
+instance MonadElab m => MonadElab (MaybeT m) where
+  getElabCxt = lift getElabCxt
+  withElabCxt = mapMaybeT . withElabCxt
+  registerElabError = lift . registerElabError
+  isErrorRegistered = lift isErrorRegistered
+  throwElabErrors = lift throwElabErrors
+  freshName = lift . freshName

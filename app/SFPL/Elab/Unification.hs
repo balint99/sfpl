@@ -93,7 +93,7 @@ solve n m sp va = do
 
 -- | Unify expected and actual types.
 unify' :: Lvl -> VTy -> VTy -> Unify ()
-unify' n va vb = pair (forceTy va) (forceTy vb) >>= \case
+unify' n va vb = forceTy va >>= \va -> forceTy vb >>= \vb -> case (va, vb) of
   (VTyVar l    , VTyVar l'     )  | l == l'  -> pure ()
   (VData l sp  , VData l' sp'  )  | l == l'  -> unifySp n sp sp'
   (VMeta m sp  , VMeta m' sp'  )  | m == m'  -> unifySp n sp sp'
@@ -104,7 +104,8 @@ unify' n va vb = pair (forceTy va) (forceTy vb) >>= \case
   (VWorld va   , VWorld vb     )  -> unify' n va vb
   (VFun va vb  , VFun va' vb'  )  -> unify' n va va' >> unify' n vb vb'
   (VForAll x cl, VForAll x' cl')  -> bindM2 (unify' (n + 1)) (cl $$$ VTyVar n) (cl' $$$ VTyVar n)
-  (VMeta m sp  , va            )  -> solve n m sp va
+  (VMeta m sp  , VMeta m' sp'  )  -> solve n m sp vb `catchError` \_ -> solve n m' sp' va
+  (VMeta m sp  , vb            )  -> solve n m sp vb
   (va          , VMeta m sp    )  -> solve n m sp va
   _                               -> throwError RigidMismatch
 
