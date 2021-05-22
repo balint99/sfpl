@@ -185,13 +185,16 @@ testPI p = getSource >>= testP p
 tyIden :: Parser TyName
 tyIden = iden <?> "type identifier"
 
+tyIdenE :: ParserE TyName
+tyIdenE = idenE <?> "type identifier"
+
 tyBinder :: Parser TyName
 tyBinder = (tyIden <?> "type variable binding") <|> underscore
 
 tyAtom :: ParserB Ty
 tyAtom = THole <$ underscore
-     <|> TyIden <$> tyIden
-     <|> apE (tryKeywordsE' [kwInt, kwFloat, kwChar] [Int, Float, Char]
+     <|> apE (TyIden <$|> tyIdenE
+          <|> tryKeywordsE' [kwInt, kwFloat, kwChar] [Int, Float, Char]
           <|> Tuple <$|> parensE (topTy `sepBy` symbol ",")
           <|> List <$|> bracketsE topTy)
      <|> checkToken 
@@ -292,8 +295,8 @@ nullFunc = tryKeywordsE nullFuncName [minBound .. maxBound]
 
 atom :: ParserB Tm
 atom = Hole <$ underscore
-   <|> Iden <$> iden
-   <|> apE (NullFunc <$|> nullFunc
+   <|> apE (Iden <$|> idenE
+        <|> NullFunc <$|> nullFunc
         <|> FloatLit <$|> floatLit
         <|> IntLit <$|> intLit
         <|> CharLit <$|> charLit

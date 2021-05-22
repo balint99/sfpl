@@ -40,7 +40,7 @@ module SFPL.Base
     kwFloat,
     kwChar,
     
-    -- ** Keywords from primitive operations
+    -- ** Keywords for primitive operations
     kwPrimEq,
     kwPrimLt,
     kwError,
@@ -69,6 +69,7 @@ module SFPL.Base
     dsGteInt,
     dsGteFloat,
     dsGteChar,
+    dsTrue,
     dsNot,
     dsAnd,
     dsOr,
@@ -76,6 +77,7 @@ module SFPL.Base
     dsList,
     dsNil,
     dsCons,
+    dsSeq,
   )
   where
 
@@ -434,6 +436,10 @@ dsGteFloat = "gteFloat"
 dsGteChar :: String
 dsGteChar = "gteChar"
 
+-- | Boolean true.
+dsTrue :: String
+dsTrue = "true"
+
 -- | Boolean not.
 dsNot :: String
 dsNot = "not"
@@ -461,3 +467,7 @@ dsNil = "nil"
 -- | List cons operation.
 dsCons :: String
 dsCons = "cons"
+
+-- | Sequencing.
+dsSeq :: String
+dsSeq = "seq"

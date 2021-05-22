@@ -10,6 +10,7 @@ module SFPL.Utils
     
     -- * Helper functions
     (<$$>),
+    addCols,
     arr,
     assocArr,
     bindM2,
@@ -25,6 +26,7 @@ import Data.Array.IArray hiding (Ix)
 import qualified Data.Array.IArray as Arr (Ix)
 import GHC.Stack
 import SFPL.Base
+import Text.Megaparsec.Pos
 import Text.PrettyPrint
 
 ------------------------------------------------------------
@@ -56,6 +58,12 @@ type WithCS c = (HasCallStack, c)
 -- | Infix synonym for 'mapM'.
 (<$$>) :: (Monad m, Traversable t) => (a -> m b) -> t a -> m (t b)
 (<$$>) = mapM
+
+-- | Add the specified amount of columns to a 'SourcePos'.
+--
+-- @since 1.0.0
+addCols :: SourcePos -> Int -> SourcePos
+addCols (SourcePos n l c) x = SourcePos n l (mkPos $ unPos c + x)
 
 -- | Create an array from a list.
 --
