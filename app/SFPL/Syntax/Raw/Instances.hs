@@ -6,30 +6,25 @@ module SFPL.Syntax.Raw.Instances where
 import SFPL.Base
 import SFPL.Syntax.Raw.Types
 import SFPL.Syntax.Raw.Pretty
+import SFPL.Utils (addCols)
 import Text.Megaparsec.Pos
-
-----------------------------------------
--- Helpers
-
-addCols :: SourcePos -> Int -> SourcePos
-addCols (SourcePos n l c) x = SourcePos n l (mkPos $ unPos c + x)
 
 ----------------------------------------
 -- Types
 
 tySpan :: Ty -> Span
 tySpan = \case
-  TyIden x beg    -> (beg, beg `addCols` length x)
-  THole beg       -> (beg, beg `addCols` 1)
-  Int beg end     -> (beg, end)
-  Float beg end   -> (beg, end)
-  Char beg end    -> (beg, end)
-  Tuple _ beg end -> (beg, end)
-  List _ beg end  -> (beg, end)
-  World a beg     -> (beg, endOf a)
-  TApp a sp       -> (begOf a, endOf $ last sp)
-  Fun a b         -> (begOf a, endOf b)
-  ForAll _ a beg  -> (beg, endOf a)
+  TyIden x beg end  -> (beg, end)
+  THole beg         -> (beg, beg `addCols` 1)
+  Int beg end       -> (beg, end)
+  Float beg end     -> (beg, end)
+  Char beg end      -> (beg, end)
+  Tuple _ beg end   -> (beg, end)
+  List _ beg end    -> (beg, end)
+  World a beg       -> (beg, endOf a)
+  TApp a sp         -> (begOf a, endOf $ last sp)
+  Fun a b           -> (begOf a, endOf b)
+  ForAll _ a beg    -> (beg, endOf a)
 
 -- | @since 1.0.0
 instance Raw Ty where
@@ -96,7 +91,7 @@ deriving instance Show LamBind -- ^ @since 1.0.0
 
 tmSpan :: Tm -> Span
 tmSpan = \case
-  Iden x beg          -> (beg, beg `addCols` length x)
+  Iden x beg end      -> (beg, end)
   Lam _ t beg         -> (beg, endOf t)
   App t u             -> (begOf t, endOf u)
   AppI t _ end        -> (begOf t, end)

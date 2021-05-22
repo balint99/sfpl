@@ -52,7 +52,7 @@ type Span = (BegPos, EndPos)
 -- @since 1.0.0
 data Ty
   = -- | A type identifier - type variable or type name.
-    TyIden TyName BegPos
+    TyIden TyName BegPos EndPos
   | -- | Type hole (to be filled in by elaboration).
     THole BegPos
   | -- | Integer type.
@@ -297,7 +297,7 @@ type CaseBranch = (Pattern, Tm)
 -- @since 1.0.0
 data Tm
   = -- | An identifier - variable, top level definition or data constructor.
-    Iden Name BegPos
+    Iden Name BegPos EndPos
   | -- | Lambda abstraction, with at least one binder.
     Lam [LamBind] Tm BegPos
   | -- | Application.

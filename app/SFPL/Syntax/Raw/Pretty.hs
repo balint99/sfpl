@@ -22,7 +22,7 @@ import Text.PrettyPrint
 -- @since 1.0.0
 prettyTy :: Prec -> Ty -> Doc
 prettyTy p = \case
-  TyIden x _    -> text x
+  TyIden x _ _  -> text x
   THole _       -> char '_'
   Int _ _       -> text kwInt
   Float _ _     -> text kwFloat
@@ -192,7 +192,7 @@ prettyDo bs t = text "do"
 -- @since 1.0.0
 prettyTm :: Prec -> Tm -> Doc
 prettyTm p = \case
-  Iden x _        -> text x
+  Iden x _ _      -> text x
   Lam bs t _      -> par p LowP $ prettyLam bs t
   App t u         -> par p AppP $ prettyTm AppP t <+> prettyTm AtomP u
   AppI t as _     -> par p AppP $ prettyTm AppP t <+> (braces . hjoin ", " $ map (prettyTy LowP) as)
