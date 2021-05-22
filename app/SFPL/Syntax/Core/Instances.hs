@@ -20,6 +20,8 @@ instance Num Ty where
   abs = undefined
   signum = undefined
 
+deriving instance Eq Ty -- ^ @since 1.0.0
+
 -- | @since 1.0.0
 instance Pretty TyPCxt Ty where
   prettyPrec = prettyTy True

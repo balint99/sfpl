@@ -37,6 +37,12 @@ data VTy
   | -- | Universal quantification.
     VForAll TyName TClosure
 
+-- | Unit type.
+--
+-- @since 1.0.0
+pattern VUnit :: VTy
+pattern VUnit = VTTuple []
+
 -- | Type values applied to a type constructor or metavariable.
 --
 -- @since 1.0.0
@@ -96,8 +102,8 @@ data Val
 -- | Unit value.
 --
 -- @since 1.0.0
-pattern VUnit :: Val
-pattern VUnit = VTuple []
+pattern VTt :: Val
+pattern VTt = VTuple []
 
 -- | Values applied to a data constructor.
 --

@@ -59,6 +59,7 @@ evalTy env = \case
   World a     -> VWorld <$> evalTy env a
   Fun a b     -> VFun <$> evalTy env a <*> evalTy env b
   ForAll x a  -> pure $ VForAll x (TClosure env a)
+  THole       -> devError "tried to evaluate type hole"
 
 -- | Evaluate a type spine in the given environment.
 evalTSp :: TEnv -> TSpine -> EvalT VTSpine
@@ -314,11 +315,11 @@ forcePutc :: MonadRun m => Env -> Tm -> m Val
 forcePutc env t = do
   vt <- evalP env t
   case vt of
-    VChar c -> VUnit <$ write [c]
+    VChar c -> VTt <$ write [c]
     _       -> devRunError "can't put " [vt]
 
 forcePrint :: MonadRun m => Env -> Tm -> m Val
-forcePrint env t = VUnit <$ (write =<< valToStringP =<< evalP env t)
+forcePrint env t = VTt <$ (write =<< valToStringP =<< evalP env t)
 
 forceIOVal :: MonadRun m => IOVal -> m Val
 forceIOVal = \case

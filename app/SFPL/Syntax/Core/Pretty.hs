@@ -80,6 +80,7 @@ prettyTy o p cxt@(xs, ms, ts) = \case
   World a     -> par p P9 $ char '%' <+> prettyTy o AppP cxt a
   Fun a b     -> par p P0 $ prettyTy o P1 cxt a <+> text "->" <+> prettyTy o LowP cxt b
   ForAll x a  -> par p LowP $ char '@' <+> text x <> prettyForAll o (tyBind x cxt) a
+  THole       -> char '_'
 
 -- | Convert a type to a pretty string, using the given information context.
 --
@@ -238,8 +239,14 @@ prettyBinOp o p cxt op t u =
   in par p opP $ prettyTm o leftP cxt t <+> text opSymbol <+> prettyTm o rightP cxt u
 
 prettyCaseBranch :: Bool -> TmPCxt -> CaseBranch -> Doc
-prettyCaseBranch o cxt@(_, _, _, pcxt) (pat, t) =
-  prettyPat LowP pcxt pat <> char '.' <+> prettyTm o LowP cxt t
+prettyCaseBranch o cxt@(xs, tls, tcxt, pcxt) (pat, t) =
+  let cxt' = case pat of
+        PTuple xs   -> foldl (flip tmBind) cxt xs
+        PCtr _ args -> foldl bindArg cxt args
+        _           -> cxt
+  in prettyPat LowP pcxt pat <> char '.' <+> prettyTm o LowP cxt' t
+  where
+    bindArg cxt = either (flip tmBind cxt) (flip tmBindTy cxt)
 
 prettyCase :: Bool -> TmPCxt -> Tm -> [CaseBranch] -> Doc
 prettyCase o cxt t = \case
@@ -329,8 +336,8 @@ tlPCxt tls ms ts cs = (arr tls, assocArr ms, arr ts, arr cs)
 --
 -- @since 1.0.0
 prettyTopLevelDef :: Bool -> Prec -> TLPCxt -> TopLevelDef -> Doc
-prettyTopLevelDef o p cxt@(tls, ms, ts, cs) (TL x a t) =
-  par p LowP $ prettyTySig o tyCxt x a
+prettyTopLevelDef o p cxt@(tls, ms, ts, cs) (TL l a t) =
+  par p LowP $ prettyTySig o tyCxt (tls ! l) a
             $$ nest 2 (char '=' <+> prettyTm o LowP tmCxt t) <> char ';'
   where
     tyCxt = ([], ms, ts)

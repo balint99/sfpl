@@ -34,6 +34,9 @@ data Ty
     Fun Ty Ty
   | -- | Universal quantification.
     ForAll TyName Ty
+  | -- | A type hole, which is the result of an elaboration failure.
+    -- The evaluation of a type hole raises an error.
+    THole
 
 -- | The parameters applied to a type constructor.
 --
@@ -235,13 +238,15 @@ data Tm
     Case Tm [CaseBranch]
   | -- | Bind in the IO monad.
     Bind Name Ty Tm Tm
-  | -- | A hole. The evaluation of a hole raises an error.
+  | -- | A hole, which is the result of an elaboration failure.
+    -- The evaluation of a hole raises an error.
     Hole
 
--- | A top-level definition.
+-- | A top-level definition, which has an identifier, a type signature
+-- and a definition.
 --
 -- @since 1.0.0
-data TopLevelDef = TL Name Ty Tm
+data TopLevelDef = TL Lvl Ty Tm
 
 ------------------------------------------------------------
 -- Type declarations
