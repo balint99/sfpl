@@ -117,8 +117,32 @@ gteChar : char -> char -> bool
 ------------------------------------------------------------
 -- Numbers
 
+even : int -> bool
+  = \x. x & 1 == 0;
+
+odd : int -> bool
+  = \x. x & 1 == 1;
+
 ------------------------------------------------------------
 -- Characters
+
+------------------------------------------------------------
+-- Tuples
+
+fst : @ a b. (a, b) -> a
+  = \x. split x as (a, b). a;
+
+snd : @ a b. (a, b) -> b
+  = \x. split x as (a, b). b;
+
+fst3 : @ a b c. (a, b, c) -> a
+  = \x. split x as (a, b, c). a;
+
+snd3 : @ a b c. (a, b, c) -> b
+  = \x. split x as (a, b, c). b;
+
+thd3 : @ a b c. (a, b, c) -> c
+  = \x. split x as (a, b, c). c;
 
 ------------------------------------------------------------
 -- IO monad and primitive operations
@@ -250,3 +274,100 @@ zipWith : @ a b c. (a -> b -> c) -> [a] -> [b] -> [c]
 
 zip : @ a b. [a] -> [b] -> [(a, b)]
   = zipWith (\a b. (a, b));
+
+unzip : @ a b. [(a, b)] -> ([a], [b])
+  = \ts. case ts of {
+    []     . ([], []);
+    t :: ts. split t as (x, y). split unzip ts as (xs, ys). (x :: xs, y :: ys)
+  };
+
+----------------------------------------
+-- More list functions
+
+length : @ a. [a] -> int
+  = foldl (\x _. x + 1) 0;
+
+reverse : @ a. [a] -> [a]
+  = foldl (flip cons) nil;
+
+append : @ a. [a] -> [a] -> [a]
+  = \xs ys. foldr cons ys xs;
+
+concat : @ a. [[a]] -> [a]
+  = foldr append nil;
+
+concatMap : @ a b. (a -> [b]) -> [a] -> [b]
+  = \f. compose concat (map f);
+
+any : @ a. (a -> bool) -> [a] -> bool
+  = \f. foldr (\x b. f x || b) false;
+
+all : @ a. (a -> bool) -> [a] -> bool
+  = \f. foldr (\x b. f x && b) true;
+
+take : @ a. int -> [a] -> [a]
+  = \n xs. if n <= 0
+      then []
+      else case xs of {
+        []     . [];
+        x :: xs. x :: take (n - 1) xs
+      };
+
+drop : @ a. int -> [a] -> [a]
+  = \n xs. if n <= 0
+      then xs
+      else case xs of {
+        []     . [];
+        _ :: xs. drop (n - 1) xs
+      };
+
+splitAt : @ a. int -> [a] -> ([a], [a])
+  = \n xs. if n <= 0
+      then ([], xs)
+      else case xs of {
+        []     . ([], []);
+        x :: xs. split splitAt (n - 1) xs as (xs, ys). (x :: xs, ys)
+      };
+
+takeWhile : @ a. (a -> bool) -> [a] -> [a]
+  = \p xs. case xs of {
+    []     . [];
+    x :: xs. if p x
+      then x :: takeWhile p xs
+      else []
+  };
+
+dropWhile : @ a. (a -> bool) -> [a] -> [a]
+  = \p xs. case xs of {
+    []     . [];
+    x :: ys. if p x
+      then dropWhile p ys
+      else xs
+  };
+
+partition : @ a. (a -> bool) -> [a] -> ([a], [a])
+  = \p xs. case xs of {
+    []     . ([], []);
+    x :: xs. split partition p xs as (ys, zs).
+      if p x
+        then (x :: ys, zs)
+        else (ys, x :: zs)
+  };
+
+------------------------------------------------------------
+-- IO
+
+printLn : @ a. a -> % ()
+  = \x. print x >> putc '\n';
+
+putStr : [char] -> % ()
+  = \cs. case cs of {
+    []     . % ();
+    c :: cs. putc c >> putStr cs
+  };
+
+putStrLn : [char] -> % ()
+  = \s. putStr s >> putc '\n';
+
+main : % ()
+  = putStrLn "Hello, world!";
