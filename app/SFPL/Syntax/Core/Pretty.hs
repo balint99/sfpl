@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
--- | Printing elements of the core syntax.
+-- | Pretty-printing elements of the core syntax.
 module SFPL.Syntax.Core.Pretty where
 
 import Prelude hiding ((<>))

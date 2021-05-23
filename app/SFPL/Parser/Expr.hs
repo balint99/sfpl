@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 -- | General expression parser for unary prefix and binary infix operators,
--- support precise span parsing.
+-- supporting precise span parsing.
 module SFPL.Parser.Expr
   ( Operator (..),
     makeExprParser,

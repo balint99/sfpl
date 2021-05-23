@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
--- | Printing values.
+-- | Pretty-printing values.
 module SFPL.Eval.Pretty where
 
 import Data.Array.IArray ((!))
@@ -14,6 +14,8 @@ import Text.PrettyPrint
 -- Terms
 
 -- | Information context for term values.
+--
+-- @since 1.0.0
 type ValPCxt = CtrNames
 
 prettyChar :: Char -> Doc

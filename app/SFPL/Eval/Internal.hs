@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances, LambdaCase, MultiParamTypeClasses #-}
 
+-- | Internal logic for evaluation.
 module SFPL.Eval.Internal where
 
 import Control.Monad.Except
@@ -28,6 +29,8 @@ infixl 5 |>
 -- Types
 
 -- | Type closure application.
+--
+-- @since 1.0.0
 ($$$) :: TClosure -> VTy -> EvalT VTy
 TClosure env a $$$ vb = evalTy (env :> vb) a
 
@@ -139,6 +142,8 @@ env +> (v : vs) = (env :> v) +> vs
 (|>) = flip (++)
 
 -- | Closure application.
+--
+-- @since 1.0.0
 ($$) :: Closure -> Val -> EvalP Val
 Closure env t $$ vu = eval (env :> vu) t
 
@@ -258,6 +263,8 @@ caseSplit env vt = \case
 
 -- | Pure evaluation of terms. Does not perform IO actions.
 -- Precondition: the term is well-typed.
+--
+-- @since 1.0.0
 eval :: Env -> Tm -> EvalP Val
 eval env = \case
   Var i         -> pure $ env !! unIx i
@@ -283,6 +290,8 @@ eval env = \case
 
 ----------------------------------------
 -- Effects
+
+-- Helpers
 
 getTopLevel :: MonadRun m => m TopLevel
 getTopLevel = (\(tl, _) -> tl) <$> getEvalCxt
@@ -338,5 +347,7 @@ forceIO = \case
   vt    -> devRunError "tried to force " [vt]
 
 -- | Evaluate a term with effects.
+--
+-- @since 1.0.0
 run :: MonadRun m => Env -> Tm -> m Val
 run env = forceIO <=< evalP env

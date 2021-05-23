@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
--- | Printing elements of the presyntax.
+-- | Pretty-printing elements of the presyntax.
 module SFPL.Syntax.Raw.Pretty where
 
 import SFPL.Syntax.Raw.Types

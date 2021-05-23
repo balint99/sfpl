@@ -1,33 +1,37 @@
 {-# LANGUAGE LambdaCase, RankNTypes, RecordWildCards, TupleSections #-}
 
+-- | Internal logic for elaboration.
 module SFPL.Elab.Internal where
 
 import Control.Arrow
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import qualified Data.HashMap.Lazy as M
-import qualified Data.HashSet as S
 import SFPL.Base
 import SFPL.Elab.Class
 import SFPL.Elab.Context
-import SFPL.Elab.Error.Types
+import SFPL.Elab.Error
 import SFPL.Elab.Metacontext
 import qualified SFPL.Elab.Unification as U
 import qualified SFPL.Eval as E
 import SFPL.Eval.Types
-import SFPL.Syntax.Core.Types
-import SFPL.Syntax.Raw.Types (Raw (..), BegPos, EndPos)
-import qualified SFPL.Syntax.Raw.Types as R
+import SFPL.Syntax.Core
+import SFPL.Syntax.Raw (Raw (..), begOf, endOf, BegPos, EndPos)
+import qualified SFPL.Syntax.Raw as R
 import SFPL.Utils
+
+----------------------------------------
+-- Operator precedence
 
 infixl 9 $$$
 
-----------------------------------------
+------------------------------------------------------------
 -- Helpers
 
 type M a = forall m. MonadElab m => m a
 type MM a = forall m. MonadElab m => MaybeT m a
 
+----------------------------------------
 -- Lookup
 
 getNextTypeDecl :: M Lvl
@@ -54,6 +58,7 @@ getTyLvl = tyLvl <$> getElabCxt
 getTmLvl :: M Lvl
 getTmLvl = tmLvl <$> getElabCxt
 
+----------------------------------------
 -- Errors
 
 registerError :: Raw r => r -> ElabErrorType -> [ElabErrorItem] -> M ()
@@ -110,6 +115,7 @@ ambiguousOverloading r ot = registerError r (AmbiguousOverloadingError ot) []
 newHole :: R.Tm -> VTy -> M ()
 newHole r va = registerError r (HoleError va) [Bindings]
 
+----------------------------------------
 -- Managing context
 
 -- | Bind a new type variable.
@@ -176,7 +182,9 @@ atTopLevel = withElabCxt dropLocal
       let printInfo = PrintCxt {tyVars = [], tmVars = [], ..}
       in ElabCxt {tyEnv = [], tyLvl = 0, tmLvl = 0, ..}
 
---  Type evaluation
+----------------------------------------
+-- Type evaluation
+
 -- Lifting from EvalT to MonadElab
 
 ($$$) :: TClosure -> VTy -> M VTy
@@ -207,7 +215,8 @@ closeTy va = do
   n <- getTyLvl
   TClosure env <$> quoteTy (n + 1) va
 
--- Unification
+----------------------------------------
+-- Metacontext and unification
 
 -- | Create a fresh metavariable with the given name.
 freshNamedMeta :: TyName -> M Ty
@@ -269,6 +278,8 @@ checkForAll h xs a = case xs of
 
 -- | Check that a type is well-formed. The first parameter gives
 -- the action to perform on holes.
+--
+-- @since 1.0.0
 checkTy' :: MonadElab m => m Ty -> R.Ty -> m Ty
 checkTy' h r = case r of
   R.TyIden x _ _    -> checkTyIden r x
@@ -283,7 +294,10 @@ checkTy' h r = case r of
   R.Fun a b         -> Fun <$> checkTy' h a <*> checkTy' h b
   R.ForAll xs a _   -> checkForAll h xs a
 
--- | Check that a type is well-formed. Creates fresh metavariables on holes.
+-- | Check that a type is well-formed.
+-- Creates fresh metavariables on holes.
+--
+-- @since 1.0.0
 checkTy :: R.Ty -> M Ty
 checkTy = checkTy' (freshNamedMeta "t")
 
@@ -294,14 +308,12 @@ checkTy = checkTy' (freshNamedMeta "t")
 -- A binding is either a term or type variable binding.
 -- For terms, their type is also stored.
 -- For types, the binding is either explicit or implicit.
+--
+-- @since 1.0.0
 type PatternBindings = [Either (Name, VTy) (Either TyName TyName)]
 
 -- | Check that a pattern has the given type.
--- Returns the list of variables the pattern binds in a 'Just',
--- or 'Nothing' if checking fails.
-checkPat :: R.Pattern -> VTy -> M (Maybe (Pattern, PatternBindings))
-checkPat r vexp = runMaybeT $ checkPat' r vexp
-
+-- Returns the list of variables the pattern binds.
 checkPat' :: R.Pattern -> VTy -> MM (Pattern, PatternBindings)
 checkPat' r vexp = case r of
   R.WildcardPat _ -> pure (PWildcard, [])
@@ -309,6 +321,14 @@ checkPat' r vexp = case r of
     (pat, vact, bindings) <- inferPat' r
     success <- unify r vexp vact
     if success then pure (pat, bindings) else mzero
+
+-- | Check that a pattern has the given type.
+-- Returns the list of variables the pattern binds in a 'Just',
+-- or 'Nothing' if checking fails.
+--
+-- @since 1.0.0
+checkPat :: R.Pattern -> VTy -> M (Maybe (Pattern, PatternBindings))
+checkPat r vexp = runMaybeT $ checkPat' r vexp
 
 tupleMetaNames :: [String]
 tupleMetaNames = [replicate c x | c <- [1 ..], x <- ['a' .. 'z']]
@@ -373,11 +393,7 @@ inferCtrPat r x args = do
 
 -- | Infer the type of a pattern.
 -- Returns the inferred type and the list of variables
--- the pattern binds in a 'Just',
--- or 'Nothing' if inference fails.
-inferPat :: R.Pattern -> M (Maybe (Pattern, VTy, PatternBindings))
-inferPat = runMaybeT . inferPat'
-
+-- the pattern binds.
 inferPat' :: R.Pattern -> MM (Pattern, VTy, PatternBindings)
 inferPat' r = case r of
   R.IntPat n _ _      -> pure (PInt n, VTInt, [])
@@ -388,6 +404,14 @@ inferPat' r = case r of
   R.ConsPat x y _ _   -> inferCtrPat r dsCons [Left x, Left y]
   R.CtrPat x args _ _ -> inferCtrPat r x args
   R.WildcardPat _     -> devError "shouldn't infer wildcard pattern"
+
+-- | Infer the type of a pattern.
+-- Returns the inferred type and the list of variables
+-- the pattern binds in a 'Just', or 'Nothing' if inference fails.
+--
+-- @since 1.0.0
+inferPat :: R.Pattern -> M (Maybe (Pattern, VTy, PatternBindings))
+inferPat = runMaybeT . inferPat'
 
 ------------------------------------------------------------
 -- Terms
@@ -496,6 +520,8 @@ checkDo bs u vb = case bs of
     pure $ Bind x a t u
 
 -- | Check that a term has the given type.
+--
+-- @since 1.0.0
 checkTm :: R.Tm -> VTy -> M Tm
 checkTm r va = forceTy va >>= \va -> case (r, va) of
   (R.Lam bs t _        , va          )  -> checkLam r bs t va
@@ -644,7 +670,7 @@ inferOverloadedUnary r ot zs f rt = do
                       | otherwise -> go t va zs
 
 rebindUnary :: Name -> BegPos -> R.Tm -> M (Tm, VTy)
-rebindUnary x beg t = inferTm $ R.App (R.Iden x beg (R.endOf t)) t
+rebindUnary x beg t = inferTm $ R.App (R.Iden x beg (endOf t)) t
 
 inferOverloadedBinary ::
   R.Tm -> OverloadType -> [(VTy, VTy)] -> (Tm -> Tm -> Tm) ->
@@ -670,7 +696,7 @@ inferOverloadedBinary r ot zs f rt ru = do
 
 rebindBinary :: Name -> R.Tm -> R.Tm -> M (Tm, VTy)
 rebindBinary x t u =
-  inferTm $ R.App (R.App (R.Iden x (R.begOf t) (R.endOf u)) t) u
+  inferTm $ R.App (R.App (R.Iden x (begOf t) (endOf u)) t) u
 
 rebindOverloadedBinary ::
   R.Tm -> OverloadType -> [(VTy, Name)] -> R.Tm -> R.Tm -> M (Tm, VTy)
@@ -693,7 +719,7 @@ rebindOverloadedBinary r ot zs rt ru = do
       (vb', x) : zs | vb == vb' -> rebind2 x t u va vb
                     | otherwise -> goSecond t va u vb zs
     rebind1 x t va = do
-      (f, vf) <- insertImpl' =<< inferTm (R.Iden x (R.begOf rt) (R.endOf ru))
+      (f, vf) <- insertImpl' =<< inferTm (R.Iden x (begOf rt) (endOf ru))
       (f, va', vb) <- ensureFun r f vf
       unify rt va' va
       (t, vb) <- insertImpl' (App f t, vb)
@@ -701,7 +727,7 @@ rebindOverloadedBinary r ot zs rt ru = do
       u <- checkTm ru vb
       pure (App t u, vc)
     rebind2 x t u va vb = do
-      (f, vf) <- insertImpl' =<< inferTm (R.Iden x (R.begOf rt) (R.endOf ru))
+      (f, vf) <- insertImpl' =<< inferTm (R.Iden x (begOf rt) (endOf ru))
       (f, va', vb') <- ensureFun r f vf
       unify rt va' va
       (t, vb') <- insertImpl' (App f t, vb')
@@ -720,7 +746,7 @@ inferUnOp r op t =
                  [(VTInt, VTInt), (VTFloat, VTFloat)] 
                  (UnOp Negate) t
     R.BNot  -> (UnOp BNot &&& const VTInt) <$> checkTm t VTInt
-    R.Not   -> rebindUnary dsNot (R.begOf r) t
+    R.Not   -> rebindUnary dsNot (begOf r) t
     R.Pure  -> (UnOp Pure *** VWorld) <$> inferTm t
 
 inferBinOp :: R.Tm -> R.BinaryOp -> R.Tm -> R.Tm -> M (Tm, VTy)
@@ -810,9 +836,9 @@ inferSwitch beg end = inferTm . foldr addBranch err
     err = R.UnFunc R.Error (R.StringLit msg beg end) beg
     addBranch (t, u) r =
       R.Case t
-        [ (R.CtrPat dsTrue [] (R.begOf t) (R.endOf t), u)
-        , (R.WildcardPat (R.endOf u), r) ]
-        (R.begOf t) (R.endOf u)
+        [ (R.CtrPat dsTrue [] (begOf t) (endOf t), u)
+        , (R.WildcardPat (endOf u), r) ]
+        (begOf t) (endOf u)
 
 inferDo :: [R.LocalBind] -> R.Tm -> M (Tm, VTy)
 inferDo bs u = case bs of
@@ -825,6 +851,8 @@ inferDo bs u = case bs of
     pure (Bind x a t u, vb)
 
 -- | Infer the type of a term.
+--
+-- @since 1.0.0
 inferTm :: R.Tm -> M (Tm, VTy)
 inferTm r = case r of
   R.Iden x _ _          -> inferIden r x
@@ -857,7 +885,7 @@ inferTm r = case r of
   R.UnFunc f t _        -> inferUnFunc r f t
   R.BinFunc f t u _     -> inferBinFunc r f t u
   R.If t u v beg        ->
-    inferTm $ R.App (R.App (R.App (R.Iden dsIfThenElse beg (R.endOf v)) t) u) v
+    inferTm $ R.App (R.App (R.App (R.Iden dsIfThenElse beg (endOf v)) t) u) v
   R.Split t xs u _      -> do
     (t, zs) <- checkSplitScrutinee t xs
     (u, vb) <- foldr (\(x, va) f -> withVar x va . f) id zs $ inferTm u
@@ -1015,12 +1043,12 @@ withConstructor x va c beg = withElabCxt bindConstructor
           printInfo = PrintCxt {constructorNames = constructorNames', ..}
       in ElabCxt {..}
 
--- | Add universal quantifiers to a constructors type, which binds
+-- | Add universal quantifiers to a constructor's type, which binds
 -- the type parameters of its parent data type.
 addForAlls :: Ty -> M Ty
 addForAlls a = do
   xs <- tyVars . printInfo <$> getElabCxt
-  pure $ foldl (\a x -> ForAll x a) a xs
+  pure $ foldl (flip ForAll) a xs
 
 -- | Elaborate a data type declaration, creating new bindings
 -- for the type and its constructors.
@@ -1044,6 +1072,7 @@ withDataDecl r@(R.DD x xs cs beg _) f = do
           goConstructors l c (\cs -> f (ctr : cs)) rs
 
 ----------------------------------------
+-- Type declarations
 
 -- | Elaborate a type declaration.
 withTypeDecl :: MonadElab m => R.TypeDecl -> (TypeDecl -> m a) -> m a
@@ -1054,6 +1083,10 @@ withTypeDecl r f = case r of
 -- Programs
 
 -- | Elaborate a program.
+-- Returns the checked program, as well as
+-- the state of the elaboration context at the end.
+--
+-- @since 1.0.0
 checkProgram :: R.Program -> M (Program, ElabCxt)
 checkProgram = go pure
   where

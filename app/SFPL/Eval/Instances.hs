@@ -6,11 +6,12 @@ module SFPL.Eval.Instances where
 import SFPL.Base
 import SFPL.Eval.Types
 import SFPL.Eval.Pretty
-import SFPL.Syntax.Core.Instances
+import SFPL.Syntax.Core
 
 ----------------------------------------
 -- Utility
 
+-- | @since 1.0.0
 instance Num VTy where
   fromInteger = VTyVar . fromInteger
   (+) = undefined
@@ -33,5 +34,6 @@ deriving instance Show IOVal   -- ^ @since 1.0.0
 deriving instance Show Val     -- ^ @since 1.0.0
 deriving instance Show Closure -- ^ @since 1.0.0
 
+-- | @since 1.0.0
 instance Pretty CtrNames Val where
   prettyPrec = prettyVal

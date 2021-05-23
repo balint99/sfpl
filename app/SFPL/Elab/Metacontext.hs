@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, FlexibleContexts #-}
+{-# LANGUAGE ExistentialQuantification, KindSignatures #-}
 
 -- | Types and functions corresponding to the metacontext of elaboration.
 module SFPL.Elab.Metacontext
@@ -6,9 +6,13 @@ module SFPL.Elab.Metacontext
     MetaState (..),
     MetaInfo (..),
     MetaEntry,
-    SomeMetas (..),
+    
+    -- ** Abstract metavariables
+    SomeMetas,
+    someMetas,
     getMeta,
     toAssocList,
+    metaNames,
     
     -- * Classes
     Metas (..),
@@ -16,14 +20,14 @@ module SFPL.Elab.Metacontext
   )
   where
 
-import Control.Monad.State
+import Control.Monad.Except
+import Control.Monad.Trans.Maybe
+import Data.Kind
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as M
 import GHC.Stack
 import SFPL.Base
-import SFPL.Syntax.Core.Types
-import SFPL.Syntax.Core.Instances
-import SFPL.Utils
+import SFPL.Syntax.Core
 
 ------------------------------------------------------------
 -- Types
@@ -58,23 +62,39 @@ data MetaInfo = MetaInfo
 -- @since 1.0.0
 type MetaEntry = (MetaState, MetaInfo)
 
+----------------------------------------
+-- Abstract metavariables
+
 -- | Abstract type for metavariable mappings.
 --
 -- @since 1.0.0
 data SomeMetas = forall ms. Metas ms => SomeMetas ms
 
--- | Lookup a metavariable.
+-- | Wrap a 'Metas' in 'SomeMetas'.
+--
+-- @since 1.0.0
+someMetas :: Metas ms => ms -> SomeMetas
+someMetas = SomeMetas
+
+-- | Lookup a metavariable in a mapping.
 --
 -- @since 1.0.0
 getMeta :: Metavar -> SomeMetas -> MetaEntry
 getMeta m (SomeMetas metas) = metasGet m metas
 
--- | Transform the mappings to an association list,
+-- | Transform the metavariable mappings to an association list,
 -- applying the given function to the entries.
 --
 -- @since 1.0.0
 toAssocList :: (MetaEntry -> e) -> SomeMetas -> [(Metavar, e)]
 toAssocList f (SomeMetas metas) = metasToAssocList f metas
+
+-- | Transform the metavariable mappings to a list that associates
+-- to each metavariable its name.
+--
+-- @since 1.0.0
+metaNames :: SomeMetas -> [(Metavar, TyName)]
+metaNames = toAssocList (metaName . snd)
 
 ------------------------------------------------------------
 -- Classes
@@ -84,7 +104,7 @@ toAssocList f (SomeMetas metas) = metasToAssocList f metas
 -- accessing the information about them efficiently.
 --
 -- @since 1.0.0
-class Metas ms where
+class Metas (ms :: Type) where
   -- | Lookup a metavariable.
   metasGet :: Metavar -> ms -> MetaEntry
   
@@ -95,7 +115,7 @@ class Metas ms where
 -- | Type class for monads with a metacontext.
 --
 -- @since 1.0.0
-class Monad m => MonadMeta m where
+class Monad m => MonadMeta (m :: Type -> Type) where
   -- | Create a fresh metavariable.
   freshMeta :: MetaInfo -> m Ty
   
@@ -109,3 +129,17 @@ class Monad m => MonadMeta m where
   
   -- | Get the current metavariable mappings.
   getMetas :: m SomeMetas
+
+-- | @since 1.0.0
+instance MonadMeta m => MonadMeta (MaybeT m) where
+  freshMeta = lift . freshMeta
+  lookupMeta = lift . lookupMeta
+  updateMeta m = lift . updateMeta m
+  getMetas = lift getMetas
+
+-- | @since 1.0.0
+instance MonadMeta m => MonadMeta (ExceptT e m) where
+  freshMeta = lift . freshMeta
+  lookupMeta = lift . lookupMeta
+  updateMeta m = lift . updateMeta m
+  getMetas = lift getMetas

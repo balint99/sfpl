@@ -5,11 +5,9 @@ module SFPL.Elab.Context where
 
 import Data.HashMap.Lazy (HashMap)
 import SFPL.Base
-import SFPL.Eval.Types
-import SFPL.Eval.Instances
-import SFPL.Syntax.Core.Types
-import SFPL.Syntax.Core.Instances
-import SFPL.Syntax.Raw.Types (BegPos)
+import SFPL.Eval
+import SFPL.Syntax.Core
+import SFPL.Syntax.Raw (BegPos)
 
 -- | The top-level context at a given point of elaboration.
 --
@@ -22,9 +20,6 @@ data TopLevelCxt = TopLevelCxt
   , -- | The identifier for the next top-level definition.
     nextTopLevelDef :: Lvl
   }
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | Namespaces, mapping names to their properties needed for elaboration.
 --
@@ -35,11 +30,8 @@ data Namespaces = Namespaces
   , -- | Term namespace.
     terms :: HashMap Name TmEntry
   }
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
--- | A namespace entry for type identifiers, containing
+-- | A namespace entry for type identifiers, containing all
 -- relevant information about the type.
 --
 -- @since 1.0.0
@@ -49,11 +41,8 @@ data TyEntry
     DataEntry Lvl Int BegPos
   | -- | A type variable, storing the size of the context when it was bound.
     TyVarEntry Lvl
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
--- | A namespace entry for term identifiers, containing
+-- | A namespace entry for term identifiers, containing all
 -- relevant information about the term.
 --
 -- @since 1.0.0
@@ -68,9 +57,6 @@ data TmEntry
   | -- | A variable, storing the size of the context when it was bound and
     -- its type.
     VarEntry Lvl VTy
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | The printing context, containing information needed for pretty-printing.
 --
@@ -87,12 +73,9 @@ data PrintCxt = PrintCxt
   , -- | Names of top-level definitions.
     topLevelDefNames :: [Name]
   }
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | The elaboration context. Contains all global and local information
--- that is needed to elaborate a given declaration.
+-- that is needed to elaborate a given syntactic element.
 --
 -- @since 1.0.0
 data ElabCxt = ElabCxt
@@ -109,6 +92,3 @@ data ElabCxt = ElabCxt
   , -- | The size of the current term context.
     tmLvl :: Lvl
   }
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )

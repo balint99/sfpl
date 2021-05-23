@@ -23,9 +23,6 @@ data ElabError = ElabError
   , -- | Optional additional error items providing details about the error.
     elabErrorItems :: [ElabErrorItem]
   }
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | The type of an elaboration error with further details.
 --
@@ -56,9 +53,6 @@ data ElabErrorType
   | -- | A function was applied to an implicit type argument.
     -- Includes the type of the function and the applied type argument.
     ImplicitApplicationError VTy Ty
-  {-| -- | A metavariable is ambiguous.
-    -- Includes the identifier of the metavariable.
-    AmbiguousMeta Metavar-}
   | -- | An overloaded operator or built-in function does not support
     -- the type of one of its operands.
     -- Includes the type of the overloaded symbol and the unsupported type.
@@ -69,9 +63,6 @@ data ElabErrorType
   | -- | A term hole was encountered.
     -- Includes the expected type of the hole.
     HoleError VTy
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | The types of syntactic elements which can generate a scope error.
 --
@@ -83,9 +74,6 @@ data SyntacticCategory
     SCVariable
   | -- | A data constructor.
     SCConstructor
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | Get the name of a syntactic category.
 --
@@ -105,9 +93,6 @@ data MalformedTypeErrorReason
   | -- | A data type was not supplied the appropriate number of type parameters.
     -- Includes the name of the type, expected and actual number of parameters.
     BadDataApplication TyName Int Int
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | The place of a type signature when type holes are not allowed.
 --
@@ -117,9 +102,6 @@ data TypeHolePlace
     THPTopLevelDef
   | -- | Type signature of a data constructor.
     THPConstructor
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | The reason why a unification failed.
 --
@@ -133,9 +115,6 @@ data UnificationErrorReason
     EscapingVariable Ix
   | -- | The metavariable solved for occurred recursively in the equation.
     Occurs Metavar
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | The type of an overloaded entity.
 --
@@ -145,9 +124,6 @@ data OverloadType
     OTOperator String
   | -- | A built-in function with its name.
     OTFunction Name
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )
 
 -- | Additional error items providing further information regarding an error.
 --
@@ -155,6 +131,3 @@ data OverloadType
 data ElabErrorItem
   = -- | A list of local bindings and their types.
     Bindings
-  deriving
-    ( Show -- ^ @since 1.0.0
-    )

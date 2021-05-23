@@ -1,18 +1,23 @@
 {-# LANGUAGE LambdaCase, RankNTypes #-}
 
 -- | Pattern unification algorithm.
-module SFPL.Elab.Unification where
+module SFPL.Elab.Unification
+  ( unify )
+  where
 
 import Control.Monad.Except
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as M
 import SFPL.Base
-import SFPL.Elab.Error.Types (UnificationErrorReason (..))
+import SFPL.Elab.Error (UnificationErrorReason (..))
 import SFPL.Elab.Metacontext
 import qualified SFPL.Eval as E (forceTy, ($$$))
 import SFPL.Eval.Types
-import SFPL.Syntax.Core.Types
+import SFPL.Syntax.Core
 import SFPL.Utils
+
+----------------------------------------
+-- Operator precedence
 
 infixl 9 $$$
 
@@ -40,10 +45,10 @@ type Unify a = forall m. MonadMeta m => ExceptT UnificationErrorReason m a
 
 -- Lifting from EvalT to Unify.
 forceTy :: VTy -> Unify VTy
-forceTy va = E.forceTy va <$> lift getMetas
+forceTy va = E.forceTy va <$> getMetas
 
 ($$$) :: TClosure -> VTy -> Unify VTy
-cl $$$ va = cl E.$$$ va <$> lift getMetas
+cl $$$ va = cl E.$$$ va <$> getMetas
 
 -- | Invert a spine, viewed as a renaming.
 -- This operation can fail if the spine does not consist of
@@ -89,7 +94,7 @@ solve :: Lvl -> Metavar -> VTSpine -> VTy -> Unify ()
 solve n m sp va = do
   pr <- invert n sp
   sol <- rename m pr va
-  lift $ updateMeta m sol
+  updateMeta m sol
 
 -- | Unify expected and actual types.
 unify' :: Lvl -> VTy -> VTy -> Unify ()
@@ -122,7 +127,8 @@ unifyTup n vas vbs = case (vas, vbs) of
   _                     -> devError "bad size for tuple"
 
 -- | Unify expected and actual types, given the size of
--- the current type context.
+-- the current type context. On success, returns 'Nothing';
+-- on failure return the reason why unification failed.
 --
 -- @since 1.0.0
 unify :: MonadMeta m => Lvl -> VTy -> VTy -> m (Maybe UnificationErrorReason)

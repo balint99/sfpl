@@ -1,17 +1,21 @@
+{-# LANGUAGE KindSignatures #-}
 
+-- | Elaboration monad class.
 module SFPL.Elab.Class where
 
 import Control.Monad.Trans
 import Control.Monad.Trans.Maybe
+import Data.Kind
 import SFPL.Base
 import SFPL.Elab.Context
 import SFPL.Elab.Error
 import SFPL.Elab.Metacontext
 
--- | Elaboration monad class.
+-- | Type class for describing monads in which
+-- elaboration can be carried out.
 --
 -- @since 1.0.0
-class MonadMeta m => MonadElab m where
+class MonadMeta m => MonadElab (m :: Type -> Type) where
   -- | Get the current elaboration context.
   getElabCxt :: m ElabCxt
   
@@ -28,16 +32,9 @@ class MonadMeta m => MonadElab m where
   -- Precondition: there is at least 1 registered error.
   throwElabErrors :: m a
   
-  -- | Find a fresh name for a metavariable, using the given
+  -- | Find a fresh name for a metavariable using the given
   -- base name.
   freshName :: TyName -> m TyName
-
--- | @since 1.0.0
-instance MonadMeta m => MonadMeta (MaybeT m) where
-  freshMeta = lift . freshMeta
-  lookupMeta = lift . lookupMeta
-  updateMeta m = lift . updateMeta m
-  getMetas = lift getMetas
 
 -- | @since 1.0.0
 instance MonadElab m => MonadElab (MaybeT m) where

@@ -27,8 +27,8 @@ prettySourcePos (SourcePos fileName (unPos -> lnum) (unPos -> cnum))
   = text fileName <> colon <> int lnum <> colon <> int cnum
 
 -- | Pretty-print a given type of elaboration error.
-prettyErrorType :: TyPCxt -> ElabCxt -> SomeMetas -> ElabErrorType -> Doc
-prettyErrorType tcxt cxt metas errorType =
+prettyErrorType :: TyPCxt -> SomeMetas -> ElabErrorType -> Doc
+prettyErrorType tcxt metas errorType =
   let vcxt = (tcxt, metas)
   in case errorType of
     NotInScopeError x cats ->
@@ -150,9 +150,9 @@ type ErrorPCxt = (SourceFile, SomeMetas)
 prettyElabError :: ErrorPCxt -> ElabError -> Doc
 prettyElabError (src, metas) (ElabError cxt errorSpan errorType errorItems) =
   let PrintCxt xs ts _ _ _ = printInfo cxt
-      tcxt = tyPCxt xs (toAssocList (metaName . snd) metas) (reverse ts)
+      tcxt = tyPCxt xs (metaNames metas) (reverse ts)
       (beg, end) = errorSpan
-      theError = prettyErrorType tcxt cxt metas errorType
+      theError = prettyErrorType tcxt metas errorType
       items = map (prettyErrorItem tcxt cxt metas) errorItems
       body = case items of
         []  -> theError

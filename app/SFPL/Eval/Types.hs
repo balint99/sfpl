@@ -1,13 +1,14 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE KindSignatures, PatternSynonyms #-}
 
 -- | Type definitions needed for evaluation.
 module SFPL.Eval.Types where
 
 import Control.Monad.Reader
+import Data.Kind
 import Data.Array.IArray hiding (Ix)
 import SFPL.Base
 import SFPL.Elab.Metacontext (SomeMetas)
-import SFPL.Syntax.Core.Types (Ty, Tm)
+import SFPL.Syntax.Core (Ty, Tm)
 
 ------------------------------------------------------------
 -- Types
@@ -156,10 +157,11 @@ type EvalP = ReaderT EvalCxt (Either EvalError)
 ------------------------------------------------------------
 -- Class
 
--- | General effectful evaluation monad class.
+-- | Type class for monads in which
+-- effectful evaluation can be carried out.
 --
 -- @since 1.0.0
-class Monad m => MonadRun m where
+class Monad m => MonadRun (m :: Type -> Type) where
   -- | Get the evaluation context.
   getEvalCxt :: m EvalCxt
   

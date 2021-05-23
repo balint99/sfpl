@@ -24,12 +24,13 @@ executable sfpl
     -- Modules included in this executable, other than Main.
     other-modules: SFPL.Base, SFPL.Elab, SFPL.Elab.Class, SFPL.Elab.Context,
                    SFPL.Elab.Error, SFPL.Elab.Error.Instances, SFPL.Elab.Error.Pretty,
-                   SFPL.Elab.Error.Types, SFPL.Elab.Internal, SFPL.Elab.Metacontext,
-                   SFPL.Elab.Unification, SFPL.Eval, SFPL.Eval.Instances, SFPL.Eval.Internal,
-                   SFPL.Eval.Pretty, SFPL.Eval.Types, SFPL.Parser, SFPL.Parser.Expr,
-                   SFPL.Syntax.Core, SFPL.Syntax.Core.Instances, SFPL.Syntax.Core.Pretty,
-                   SFPL.Syntax.Core.Types, SFPL.Syntax.Raw, SFPL.Syntax.Raw.Instances,
-                   SFPL.Syntax.Raw.Pretty, SFPL.Syntax.Raw.Types, SFPL.Utils
+                   SFPL.Elab.Error.Types, SFPL.Elab.Instances, SFPL.Elab.Internal,
+                   SFPL.Elab.Metacontext, SFPL.Elab.Unification, SFPL.Eval, SFPL.Eval.Instances,
+                   SFPL.Eval.Internal, SFPL.Eval.Pretty, SFPL.Eval.Types, SFPL.Parser,
+                   SFPL.Parser.Internal, SFPL.Parser.Expr, SFPL.Syntax.Core,
+                   SFPL.Syntax.Core.Instances, SFPL.Syntax.Core.Pretty, SFPL.Syntax.Core.Types,
+                   SFPL.Syntax.Raw, SFPL.Syntax.Raw.Instances, SFPL.Syntax.Raw.Pretty,
+                   SFPL.Syntax.Raw.Types, SFPL.Utils
 
     -- LANGUAGE extensions used by modules in this package.
     other-extensions: ConstraintKinds, DerivingVia, ExistentialQuantification,
