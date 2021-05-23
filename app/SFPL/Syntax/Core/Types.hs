@@ -122,8 +122,8 @@ binOpDetails = \case
   Mul   -> (P7, LeftAssoc , "*" )
   Div   -> (P7, LeftAssoc , "/" )
   Exp   -> (P8, RightAssoc, "^" )
-  BAnd  -> (P7, LeftAssoc , "|" )
-  BOr   -> (P6, LeftAssoc , "&" )
+  BAnd  -> (P7, LeftAssoc , "&" )
+  BOr   -> (P6, LeftAssoc , "|" )
 
 -- | Built-in nullary functions (constants).
 --
