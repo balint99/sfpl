@@ -238,3 +238,15 @@ foldl : @ a b. (b -> a -> b) -> b -> [a] -> b
       []     . z;
       x :: xs. foldl f (f z x) xs
     };
+
+zipWith : @ a b c. (a -> b -> c) -> [a] -> [b] -> [c]
+  = \f xs ys. case xs of {
+      []     . [];
+      x :: xs. case ys of {
+        []     . [];
+        y :: ys. f x y :: zipWith f xs ys
+      };
+    };
+
+zip : @ a b. [a] -> [b] -> [(a, b)]
+  = zipWith (\a b. (a, b));
