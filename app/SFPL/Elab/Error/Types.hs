@@ -17,7 +17,8 @@ data ElabError = ElabError
   { -- | State of elaboration context at the point when the error occured.
     elabErrorCxt :: ElabCxt
   , -- | The precise span in the source where the error occured.
-    elabErrorSpan :: Span
+    -- 'Nothing' means there is no location info.
+    elabErrorSpan :: Maybe Span
   , -- | The type of the error, which includes further details.
     elabErrorType :: ElabErrorType
   , -- | Optional additional error items providing details about the error.
@@ -63,6 +64,10 @@ data ElabErrorType
   | -- | A term hole was encountered.
     -- Includes the expected type of the hole.
     HoleError VTy
+  | -- | The main function was not found.
+    MainNotFoundError
+  | -- | The main function was defined as a data constructor.
+    IllegalMainError
 
 -- | The types of syntactic elements which can generate a scope error.
 --

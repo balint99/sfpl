@@ -27,10 +27,17 @@ module SFPL.Elab
     checkTm,
     inferTm,
     checkProgram,
+    checkMainProgram,
     
     -- * Elaboration
     Elab,
     ElabSt (..),
+    
+    -- ** Functions
+    emptyElabCxt,
+    emptyElabSt,
+    runElab,
+    elabProgram,
   )
   where
 
@@ -45,6 +52,7 @@ import qualified SFPL.Elab.Internal as I
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Either
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as M
 import SFPL.Base
@@ -116,7 +124,16 @@ inferTm = I.inferTm
 checkProgram :: MonadElab m => R.Program -> m (Program, ElabCxt)
 checkProgram = I.checkProgram
 
-----------------------------------------
+-- | Elaborate a program and the check for the
+-- presence of the main function. Returns the checked
+-- program, the top-level identifier of the main function
+-- and the state of the elaboration context at the end.
+--
+-- @since 1.0.0
+checkMainProgram :: MonadElab m => R.Program -> m (Program, Lvl, ElabCxt)
+checkMainProgram = I.checkMainProgram
+
+------------------------------------------------------------
 -- Concrete elaboration monad
 
 -- | Elaboration state.
@@ -202,7 +219,7 @@ throwElabErrorsElab = do
   errors <- elabErrors <$> get
   case errors of
     []  -> devError "no registered elaboration errors"
-    _   -> throwError errors
+    _   -> throwError $ reverse errors
 
 -- | Find a fresh name for a metavariable using
 -- the given base name.
@@ -224,3 +241,58 @@ instance MonadElab Elab where
   isErrorRegistered = not . null . elabErrors <$> get
   throwElabErrors = throwElabErrorsElab
   freshName = freshNameElab
+
+----------------------------------------
+-- Functions
+
+-- | The empty elaboration context.
+--
+-- @since 1.0.0
+emptyElabCxt = ElabCxt
+  { topLevelCxt = TopLevelCxt 0 0 0
+  , names = Namespaces M.empty M.empty
+  , printInfo = PrintCxt [] [] [] [] []
+  , tyEnv = []
+  , tyLvl = 0
+  , tmLvl = 0
+  }
+
+-- | The empty elaboration state.
+--
+-- @since 1.0.0
+emptyElabSt :: ElabSt
+emptyElabSt = ElabSt
+  { metaEntries = M.empty
+  , nextMeta = 0
+  , elabErrors = []
+  , metaCounters = M.empty
+  }
+
+-- | Run the given elaboration computation starting from
+-- the empty context and empty state, and return the result
+-- along with the final state of the metacontext.
+-- The result may be a bunch of elaboration errors.
+--
+-- @since 1.0.0
+runElab :: Elab a -> (Either [ElabError] a, SomeMetas)
+runElab m =
+  let (res, st) = runState (runExceptT (runReaderT m emptyElabCxt)) emptyElabSt
+  in (res, someMetas $ metaEntries st)
+
+-- | Fully elaborate a complete program, preparing it
+-- for evaluation. Returns the prepared evaluation context
+-- and the top-level identifier of the main function on success
+-- or a bunch of elaboration errors on failure, as well as
+-- the final state of the metacontext.
+--
+-- @since 1.0.0
+elabProgram :: R.Program -> (Either [ElabError] (EvalCxt, Lvl), SomeMetas)
+elabProgram r =
+  let (res, metas) = runElab (checkMainProgram r)
+  in (prepare <$> res, metas)
+  where
+    prepare (prog, l, cxt) =
+      let tls = map getDef $ rights prog
+          cs = reverse . constructorNames $ printInfo cxt
+      in (evalCxt tls cs, l)
+    getDef (TL _ _ t) = t

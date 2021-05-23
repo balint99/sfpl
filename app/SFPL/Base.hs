@@ -34,6 +34,7 @@ module SFPL.Base
   
     -- * Constants
     keywords,
+    mainFunction,
     
     -- ** Keywords for types
     kwInt,
@@ -84,6 +85,8 @@ module SFPL.Base
 import qualified Data.Ix as Ix
 import Data.Hashable
 import Data.Kind
+import Data.Void
+import Text.Megaparsec
 import Text.PrettyPrint
 
 ------------------------------------------------------------
@@ -226,6 +229,8 @@ class Pretty (cxt :: Type) (a :: Type) where
   {-# MINIMAL prettyPrec | pretty #-}
 
 -- Default instance
+
+-- | @since 1.0.0
 instance {-# OVERLAPPABLE #-} Pretty' a => Pretty () a where
   prettyPrec p _ = prettyPrec' p
   pretty _ = pretty'
@@ -298,6 +303,10 @@ showPrettyPrec1' p a = renderStyle (style {mode = OneLineMode}) $ prettyPrec' p 
 showPretty1' :: Pretty' a => a -> String
 showPretty1' a = renderStyle (style {mode = OneLineMode}) $ pretty' a
 
+-- | @since 1.0.0
+instance Pretty' (ParseErrorBundle String Void) where
+  pretty' = text . errorBundlePretty
+
 ------------------------------------------------------------
 -- Constants
 
@@ -310,6 +319,13 @@ keywords =
   , kwError, kwRead, kwPeek, kwIsEOF, kwPutc, kwPrint
   , "let", "in", "if", "then", "else", "switch"
   , "split", "as", "case", "of", "do", "_", "data" ]
+
+-- | The name of the main function which gets executed when
+-- the program is run.
+--
+-- @since 1.0.0
+mainFunction :: Name
+mainFunction = "main"
 
 ----------------------------------------
 -- Keywords for types

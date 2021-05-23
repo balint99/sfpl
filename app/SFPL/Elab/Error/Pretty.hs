@@ -16,7 +16,7 @@ import SFPL.Elab.Metacontext
 import SFPL.Eval (VTyPCxt, VTy)
 import SFPL.Syntax.Core
 import SFPL.Syntax.Raw.Instances
-import SFPL.Syntax.Raw.Types (BegPos, EndPos)
+import SFPL.Syntax.Raw.Types (Span)
 import SFPL.Utils
 import Text.Megaparsec.Pos
 import Text.PrettyPrint
@@ -25,6 +25,12 @@ import Text.PrettyPrint
 prettySourcePos :: SourcePos -> Doc
 prettySourcePos (SourcePos fileName (unPos -> lnum) (unPos -> cnum))
   = text fileName <> colon <> int lnum <> colon <> int cnum
+
+-- | Pretty-print a location info, which may be missing.
+prettyLocationInfo :: Maybe SourcePos -> Doc
+prettyLocationInfo = \case
+  Nothing   -> text "<no location info>"
+  Just pos  -> prettySourcePos pos
 
 -- | Pretty-print a given type of elaboration error.
 prettyErrorType :: TyPCxt -> SomeMetas -> ElabErrorType -> Doc
@@ -91,6 +97,10 @@ prettyErrorType tcxt metas errorType =
       in  text "Ambiguous use of" <+> text s <+> quotes (text x)
     HoleError va ->
       text "Found hole: _ :" <+> pretty vcxt va
+    MainNotFoundError ->
+      text "Could not find a definition for" <+> text mainFunction
+    IllegalMainError ->
+      text "Illegal name for data constructor:" <+> text mainFunction
   where
     capitalize (c : cs) = toUpper c : cs
     otHelper ot = case ot of
@@ -119,19 +129,21 @@ prettyErrorItem tcxt cxt metas = \case
               $$ nest 2 (vcat bindings)
 
 -- | Pretty-print the offending line.
-prettyOffendingLine :: SourceFile -> BegPos -> EndPos -> Doc
-prettyOffendingLine src beg end =
-  let SourcePos _ (unPos -> begLine) (unPos -> begCol) = beg
-      SourcePos _ (unPos -> endLine) (unPos -> endCol) = end
-      lineNumber = show begLine
-      padding = text $ map (const ' ') lineNumber
-      line = src ! (begLine - 1)
-      marker = if begLine == endLine
-        then text $ replicate (endCol - begCol) '^'
-        else text (replicate (length line - begCol + 2) '^') <> text "..."
-  in  padding <+> char '|'
-   $$ text lineNumber <+> char '|' <+> text line
-   $$ padding <+> char '|' <+> text (replicate (begCol - 1) ' ') <> marker
+prettyOffendingLine :: SourceFile -> Maybe Span -> Doc
+prettyOffendingLine src = \case
+  Nothing         -> empty
+  Just (beg, end) ->
+    let SourcePos _ (unPos -> begLine) (unPos -> begCol) = beg
+        SourcePos _ (unPos -> endLine) (unPos -> endCol) = end
+        lineNumber = show begLine
+        padding = text $ map (const ' ') lineNumber
+        line = src ! (begLine - 1)
+        marker = if begLine == endLine
+          then text $ replicate (endCol - begCol) '^'
+          else text (replicate (length line - begCol + 2) '^') <> text "..."
+    in  padding <+> char '|'
+     $$ text lineNumber <+> char '|' <+> text line
+     $$ padding <+> char '|' <+> text (replicate (begCol - 1) ' ') <> marker
 
 -- | The contents of a source file as an array of lines.
 --
@@ -151,13 +163,18 @@ prettyElabError :: ErrorPCxt -> ElabError -> Doc
 prettyElabError (src, metas) (ElabError cxt errorSpan errorType errorItems) =
   let PrintCxt xs ts _ _ _ = printInfo cxt
       tcxt = tyPCxt xs (metaNames metas) (reverse ts)
-      (beg, end) = errorSpan
       theError = prettyErrorType tcxt metas errorType
       items = map (prettyErrorItem tcxt cxt metas) errorItems
       body = case items of
         []  -> theError
         _   -> vcat . map (\d -> char '*' $$ nest 2 d) $ theError : items
-      offendingLine = prettyOffendingLine src beg end
-  in  prettySourcePos beg <> text ": error:"
+      offendingLine = prettyOffendingLine src errorSpan
+  in  prettyLocationInfo (fst <$> errorSpan) <> text ": error:"
    $$ nest 4 body
    $$ offendingLine
+
+-- | Pretty-print a stack of elaboration errors.
+--
+-- @since 1.0.0
+prettyElabErrors :: ErrorPCxt -> [ElabError] -> Doc
+prettyElabErrors cxt = vcat . map (($$ text "") . prettyElabError cxt)

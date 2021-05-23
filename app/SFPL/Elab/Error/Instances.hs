@@ -20,3 +20,7 @@ deriving instance Show TypeHolePlace            -- ^ @since 1.0.0
 deriving instance Show UnificationErrorReason   -- ^ @since 1.0.0
 deriving instance Show OverloadType             -- ^ @since 1.0.0
 deriving instance Show ElabErrorItem            -- ^ @since 1.0.0
+
+-- | @since 1.0.0
+instance Pretty ErrorPCxt [ElabError] where
+  pretty = prettyElabErrors

@@ -64,7 +64,7 @@ getTmLvl = tmLvl <$> getElabCxt
 registerError :: Raw r => r -> ElabErrorType -> [ElabErrorItem] -> M ()
 registerError r errorType errorItems = do
   cxt <- getElabCxt
-  registerElabError $ ElabError cxt (spanOf r) errorType errorItems
+  registerElabError $ ElabError cxt (Just $ spanOf r) errorType errorItems
 
 stopAfter :: MonadElab m => m a -> m b
 stopAfter ma = ma >> throwElabErrors
@@ -114,6 +114,14 @@ ambiguousOverloading r ot = registerError r (AmbiguousOverloadingError ot) []
 
 newHole :: R.Tm -> VTy -> M ()
 newHole r va = registerError r (HoleError va) [Bindings]
+
+mainNotFound :: M ()
+mainNotFound = do
+  cxt <- getElabCxt
+  registerElabError $ ElabError cxt Nothing MainNotFoundError []
+
+illegalMain :: R.Constructor -> M ()
+illegalMain r = registerError r IllegalMainError []
 
 ----------------------------------------
 -- Managing context
@@ -930,18 +938,26 @@ withTopLevel x va beg = withElabCxt bindTopLevel
       in ElabCxt {..}
 
 -- | Elaborate a top-level definition.
+-- In the case of the main function, also check that
+-- it has the right type.
 withTopLevelDef :: MonadElab m => R.TopLevelDef -> (TopLevelDef -> m a) -> m a
 withTopLevelDef r@(R.TL x a t beg _) f = do
   checkTopLevelDefScope r
   l <- getNextTopLevelDef
   a <- checkTy' illegalTy a
   va <- evalTy [] a
+  if x == mainFunction
+    then checkMainType va
+    else pure ()
   withTopLevel x va beg $ do
     checkForErrors $ do
       t <- checkTm t va
       f (TL l a t)
   where
     illegalTy = stopAfter $ invalidHole a THPTopLevelDef
+    checkMainType va = do
+      vexp <- VWorld <$> freshNamedMeta' "t"
+      () <$ unify a vexp va
 
 ------------------------------------------------------------
 -- Type declarations
@@ -984,6 +1000,9 @@ checkCtrTy x l r = do
 -- | Elaborate a constructor declaration.
 checkCtr :: Lvl -> R.Constructor -> M (Constructor, Name, BegPos)
 checkCtr parentLvl r@(R.Constructor x a beg) = do
+  if x == mainFunction
+    then stopAfter $ illegalMain r
+    else pure ()
   me <- lookupTm x
   case me of
     Nothing -> do
@@ -1095,3 +1114,20 @@ checkProgram = go pure
       d : ds  -> case d of
         Left td   -> withTypeDecl td $ \td -> go (\p -> f (Left td : p)) ds
         Right tl  -> withTopLevelDef tl $ \tl -> go (\p -> f (Right tl : p)) ds
+
+-- | Elaborate a program and the check for the
+-- presence of the main function. Returns the checked
+-- program, the top-level identifier of the main function
+-- and the state of the elaboration context at the end.
+--
+-- @since 1.0.0
+checkMainProgram :: R.Program -> M (Program, Lvl, ElabCxt)
+checkMainProgram r = do
+  (prog, cxt) <- checkProgram r
+  withElabCxt (const cxt) $ do
+    me <- lookupTm mainFunction
+    case me of
+      Nothing     -> stopAfter mainNotFound
+      Just entry  -> case entry of
+        TopLevelEntry l _ _ -> (\cxt -> (prog, l, cxt)) <$> getElabCxt
+        _                   -> devError "main function was not a top-level definition"
