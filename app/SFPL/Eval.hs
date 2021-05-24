@@ -58,6 +58,7 @@ import Control.Monad.Reader
 import SFPL.Base
 import SFPL.Syntax.Core
 import SFPL.Utils
+import System.Exit
 import System.IO
 
 ----------------------------------------
@@ -95,8 +96,10 @@ type Eval = ReaderT EvalCxt IO
 -- | Terminate evaluation with a runtime error.
 --
 -- @since 1.0.0
-throwEvalErrorEval :: EvalError -> IO ()
-throwEvalErrorEval msg = putStrLn $ "\nException: " ++ msg
+throwEvalErrorEval :: EvalError -> Eval a
+throwEvalErrorEval msg = do
+  liftIO . putStrLn $ "\nException: " ++ msg
+  liftIO exitSuccess
 
 -- | Read the next character from standard input.
 -- Returns 'Nothing' if end of file has been reached;
@@ -121,7 +124,7 @@ peekCharEval =  do
 -- | @since 1.0.0
 instance MonadRun Eval where
   getEvalCxt = ask
-  throwEvalError = error
+  throwEvalError = throwEvalErrorEval
   readChar = readCharEval
   peekChar = peekCharEval
   write = liftIO . putStr
