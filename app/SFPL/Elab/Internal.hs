@@ -755,7 +755,7 @@ inferUnOp r op t =
                  (UnOp Negate) t
     R.BNot  -> (UnOp BNot &&& const VTInt) <$> checkTm t VTInt
     R.Not   -> rebindUnary dsNot (begOf r) t
-    R.Pure  -> (UnOp Pure *** VWorld) <$> inferTm t
+    R.Pure  -> (UnOp Pure *** VWorld) <$> (insertImpl' =<< inferTm t)
 
 inferBinOp :: R.Tm -> R.BinaryOp -> R.Tm -> R.Tm -> M (Tm, VTy)
 inferBinOp r op t u =

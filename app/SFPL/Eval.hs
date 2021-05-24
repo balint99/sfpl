@@ -92,6 +92,12 @@ evalClosed cxt t = runReaderT (eval [] t) cxt
 -- @since 1.0.0
 type Eval = ReaderT EvalCxt IO
 
+-- | Terminate evaluation with a runtime error.
+--
+-- @since 1.0.0
+throwEvalErrorEval :: EvalError -> IO ()
+throwEvalErrorEval msg = putStrLn $ "\nException: " ++ msg
+
 -- | Read the next character from standard input.
 -- Returns 'Nothing' if end of file has been reached;
 -- otherwise returns the next character in a 'Just'.
