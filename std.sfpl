@@ -369,5 +369,29 @@ putStr : [char] -> % ()
 putStrLn : [char] -> % ()
   = \s. putStr s >> putc '\n';
 
+readLine : % [char]
+  = do b <- isEOF then
+    if b
+      then % ""
+      else do c <- read then
+           if c == '\n'
+             then % ""
+             else do s <- readLine then % (c :: s);
+
+eqString : [char] -> [char] -> bool
+  = \xs ys. case xs of {
+      []     . case ys of {
+        []     . true;
+        y :: ys. false;
+      };
+      x :: xs. case ys of {
+        []     . false;
+        y :: ys. x == y && eqString xs ys
+      };
+    };
+
 main : % ()
-  = putStrLn "Hello, world!";
+  = do x <- readLine then
+    if eqString x "exit"
+      then % ()
+      else putStrLn x >> main;
