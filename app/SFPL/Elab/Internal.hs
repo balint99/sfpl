@@ -512,8 +512,8 @@ checkCaseTerms t zs va = Case t <$> go zs
   where
     go = \case
       []                    -> pure []
-      (p, bindings, u) : zs -> withPatternBindings bindings $ do
-        u <- checkTm u va
+      (p, bindings, u) : zs -> do
+        u <- withPatternBindings bindings $ checkTm u va
         bs <- go zs
         pure $ (p, u) : bs
 
