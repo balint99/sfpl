@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, RecordWildCards #-}
+{-# LANGUAGE FlexibleInstances, LambdaCase, RecordWildCards #-}
 
 -- | Elaboration.
 module SFPL.Elab

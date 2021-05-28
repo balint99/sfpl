@@ -1,0 +1,3 @@
+data list a
+  = nil : [a]
+  | cons : a -> [a] -> [a];

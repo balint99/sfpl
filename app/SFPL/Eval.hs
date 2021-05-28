@@ -36,6 +36,7 @@ module SFPL.Eval
     evalTy,
     forceTy,
     quoteTy,
+    normalizeTypes,
     VTyPCxt,
     prettyVTy,
     

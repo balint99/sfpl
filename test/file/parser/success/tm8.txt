@@ -1,0 +1,8 @@
+switch {
+  1 != 2 -> __read;
+  ! (9 <= 4 || 4 >= 9) -> __peek;
+  false -> __putc 'x' >> __print ('a' :: 'b' :: []) >> % 'c';
+  __eq (float 2) 3.0 == 1 -> __error (char 97);
+  __lt 4 3 -> do b <- __is_eof
+              then % (if b then 'a' else 'b')
+}

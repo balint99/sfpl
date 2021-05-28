@@ -1,0 +1,5 @@
+double : int -> int
+  = \(x : int). x * 2;
+
+four : int
+  = double 2;

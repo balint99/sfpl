@@ -1,0 +1,3 @@
+id : @ a. a -> a = \x. x;
+idOne : int = id 1;
+ 

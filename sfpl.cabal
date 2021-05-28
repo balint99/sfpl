@@ -36,7 +36,8 @@ common deps
     default-language: Haskell2010
 
 common test-deps
-    build-depends:    HUnit ^>= 1.6.2
+    build-depends:    hspec ^>= 2.8.2,
+                      hspec-megaparsec ^>= 2.2.0
 
 library sfpl-internal
     import:           deps
@@ -69,5 +70,6 @@ test-suite test
     import:           deps, test-deps
     type:             exitcode-stdio-1.0
     main-is:          Main.hs
+    other-modules:    SFPL.ElabSpec, SFPL.EvalSpec, SFPL.ParserSpec, Utils
     build-depends:    sfpl-internal
     hs-source-dirs:   test

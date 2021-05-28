@@ -1,7 +1,10 @@
 
 -- | The parser for the language.
 module SFPL.Parser
-  ( -- * Parsers
+  ( -- * Parser type
+    Parser,
+  
+    -- * Parsers
     ty,
     pat,
     tm,
@@ -11,7 +14,8 @@ module SFPL.Parser
     program,
     
     -- * Helpers
-    parseProgram
+    topLevel,
+    parseProgram,
   )
   where
 

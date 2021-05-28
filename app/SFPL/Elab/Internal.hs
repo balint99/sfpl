@@ -822,7 +822,7 @@ inferUnFunc r f t =
                    (UnFunc ToChar) t
     R.Error   -> do
       (t, _) <- inferTm t
-      pure (UnFunc Error t, VForAll "a" $ TClosure [] 0)
+      pure (UnFunc Error t, VForAll "b" $ TClosure [] 0)
     R.Putc    -> (UnFunc Putc &&& const (VWorld VUnit)) <$> checkTm t VTChar
     R.Print   -> (UnFunc Print *** const (VWorld VUnit)) <$> inferTm t
 

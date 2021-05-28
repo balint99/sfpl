@@ -52,6 +52,9 @@ symbol = L.symbol sc
 signed :: Num a => Parser a -> Parser a
 signed = L.signed sc
 
+-- | Make a parser a top-level parser.
+--
+-- @since 1.0.0
 topLevel :: Parser a -> Parser a
 topLevel p = sc *> p <* eof
 

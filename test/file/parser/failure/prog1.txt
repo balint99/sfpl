@@ -1,0 +1,5 @@
+id : @ a. a -> a
+  = \x. x
+
+const : @ a. a -> b -> a
+  = \x y. x;

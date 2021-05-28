@@ -1,0 +1,31 @@
+data bool
+  = true  : bool
+  | false : bool;
+
+ifThenElse : @ a. bool -> a -> a -> a
+  = \x a b. case x of {
+      true . a;
+      false. b
+    };
+
+intToBool : int -> bool
+  = \x. case x of {
+      0. false;
+      _. true
+    };
+
+eqInt : int -> int -> bool
+  = \x y. intToBool (__eq x y);
+
+ltInt : int -> int -> bool
+  = \x y. intToBool (__lt x y);
+
+error : @ a b. a -> b
+  = \x. __error x;
+
+fact : int -> int
+  = \n. if n < 0
+          then error n
+          else if n == 0
+            then 1
+            else n * fact (n - 1);

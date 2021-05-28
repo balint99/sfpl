@@ -1,9 +1,19 @@
 
-import SFPL.Parser
-import Test.HUnit
+-- | Main program of tests.
+module Main where
 
-tests :: Test
-tests = test ["test" ~: 1 @=? 1]
+import SFPL.Parser
+import Test.Hspec
+
+import qualified SFPL.ElabSpec as Elab
+import qualified SFPL.EvalSpec as Eval
+import qualified SFPL.ParserSpec as Parser
 
 main :: IO ()
-main = runTestTTAndExit tests
+main = hspec spec
+
+spec :: Spec
+spec = do
+  describe "Parser"       Parser.spec
+  describe "Elaboration"  Elab.spec
+  describe "Evaluation"   Eval.spec

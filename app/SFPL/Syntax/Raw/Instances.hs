@@ -38,6 +38,8 @@ instance Pretty' Ty where
 instance Show Ty where
   showsPrec p a = showString $ showPrettyPrec' (intToPrec p) a
 
+deriving instance Eq Ty -- ^ @since 1.0.0
+
 ----------------------------------------
 -- Patterns
 
@@ -63,31 +65,39 @@ instance Pretty' Pattern where
 -- | @since 1.0.0
 instance Show Pattern where
   showsPrec p pat = showString $ showPrettyPrec' (intToPrec p) pat
+
+deriving instance Eq Pattern -- ^ @since 1.0.0
   
 ----------------------------------------
 -- Terms
 
 deriving instance Show    UnaryOp -- ^ @since 1.0.0
+deriving instance Eq      UnaryOp -- ^ @since 1.0.0
 deriving instance Enum    UnaryOp -- ^ @since 1.0.0
 deriving instance Bounded UnaryOp -- ^ @since 1.0.0
 
 deriving instance Show    BinaryOp -- ^ @since 1.0.0
+deriving instance Eq      BinaryOp -- ^ @since 1.0.0
 deriving instance Enum    BinaryOp -- ^ @since 1.0.0
 deriving instance Bounded BinaryOp -- ^ @since 1.0.0
 
 deriving instance Show    NullaryFunc -- ^ @since 1.0.0
+deriving instance Eq      NullaryFunc -- ^ @since 1.0.0
 deriving instance Enum    NullaryFunc -- ^ @since 1.0.0
 deriving instance Bounded NullaryFunc -- ^ @since 1.0.0
 
 deriving instance Show    UnaryFunc -- ^ @since 1.0.0
+deriving instance Eq      UnaryFunc -- ^ @since 1.0.0
 deriving instance Enum    UnaryFunc -- ^ @since 1.0.0
 deriving instance Bounded UnaryFunc -- ^ @since 1.0.0
 
 deriving instance Show    BinaryFunc -- ^ @since 1.0.0
+deriving instance Eq      BinaryFunc -- ^ @since 1.0.0
 deriving instance Enum    BinaryFunc -- ^ @since 1.0.0
 deriving instance Bounded BinaryFunc -- ^ @since 1.0.0
 
 deriving instance Show LamBind -- ^ @since 1.0.0
+deriving instance Eq   LamBind -- ^ @since 1.0.0
 
 tmSpan :: Tm -> Span
 tmSpan = \case
@@ -127,6 +137,8 @@ instance Pretty' Tm where
 instance Show Tm where
   showsPrec p t = showString $ showPrettyPrec' (intToPrec p) t
 
+deriving instance Eq Tm -- ^ @since 1.0.0
+
 topLevelDefSpan :: TopLevelDef -> Span
 topLevelDefSpan (TL _ _ _ beg end) = (beg, end)
 
@@ -141,6 +153,8 @@ instance Pretty' TopLevelDef where
 -- | @since 1.0.0
 instance Show TopLevelDef where
   showsPrec p tl = showString $ showPrettyPrec' (intToPrec p) tl
+
+deriving instance Eq TopLevelDef -- ^ @since 1.0.0
 
 ----------------------------------------
 -- Type declarations
@@ -160,6 +174,8 @@ instance Pretty' Constructor where
 instance Show Constructor where
   showsPrec p ctr = showString $ showPrettyPrec' (intToPrec p) ctr
 
+deriving instance Eq Constructor -- ^ @since 1.0.0
+
 dataDeclSpan :: DataDecl -> Span
 dataDeclSpan (DD _ _ _ beg end) = (beg, end)
 
@@ -174,6 +190,8 @@ instance Pretty' DataDecl where
 -- | @since 1.0.0
 instance Show DataDecl where
   showsPrec p dd = showString $ showPrettyPrec' (intToPrec p) dd
+
+deriving instance Eq DataDecl -- ^ @since 1.0.0
 
 typeDeclSpan :: TypeDecl -> Span
 typeDeclSpan = \case
@@ -190,6 +208,8 @@ instance Pretty' TypeDecl where
 -- | @since 1.0.0
 instance Show TypeDecl where
   showsPrec p td = showString $ showPrettyPrec' (intToPrec p) td
+
+deriving instance Eq TypeDecl -- ^ @since 1.0.0
 
 ----------------------------------------
 -- Programs

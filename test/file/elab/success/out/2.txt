@@ -1,0 +1,5 @@
+id : @ a. a -> a
+  = \{a} (x : a). x;
+
+idOne : int
+  = id {int} 1;

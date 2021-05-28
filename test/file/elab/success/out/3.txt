@@ -1,0 +1,27 @@
+data bool
+  = true : bool
+  | false : bool;
+
+ifThenElse : @ a. bool -> a -> a -> a
+  = \{a} (x : bool)(a : a)(b : a). case x of {
+                                     true. a;
+                                     false. b
+                                   };
+
+intToBool : int -> bool
+  = \(x : int). case x of {
+                  0. false;
+                  _. true
+                };
+
+eqInt : int -> int -> bool
+  = \(x : int)(y : int). intToBool (__eq x y);
+
+ltInt : int -> int -> bool
+  = \(x : int)(y : int). intToBool (__lt x y);
+
+error : @ a b. a -> b
+  = \{a b} (x : a). __error x {b};
+
+fact : int -> int
+  = \(n : int). ifThenElse {int} (ltInt n 0) (error {int, int} n) (ifThenElse {int} (eqInt n 0) 1 (n * fact (n - 1)));

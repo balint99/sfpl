@@ -1,0 +1,2 @@
+data T a
+  = T1 : @ b. (a, b) -> (@ c. c -> b) -> T a;

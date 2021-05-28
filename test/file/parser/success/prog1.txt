@@ -1,0 +1,19 @@
+data bool
+  = true : bool
+  | false : bool;
+
+data list a
+  = nil : [a]
+  | cons : a -> [a] -> [a];
+
+id : @ a. a -> a
+  = \x. x;
+
+const : @ a b. a -> b -> a
+  = \x y. x;
+
+filter : @ a. (a -> bool) -> [a] -> [a]
+  = \p xs. case xs of {
+             []. [];
+             x :: xs. if p x then x :: filter p xs else filter p xs
+           };

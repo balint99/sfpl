@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, LambdaCase, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances, LambdaCase, MultiParamTypeClasses, TupleSections #-}
 
 -- | Internal logic for evaluation.
 module SFPL.Eval.Internal where
@@ -102,6 +102,65 @@ quoteTSp :: Lvl -> VTSpine -> EvalT TSpine
 quoteTSp n = \case
   []        -> pure []
   sp :> va  -> (:>) <$> quoteTSp n sp <*> quoteTy n va
+    
+normalizeMeta :: Lvl -> TEnv -> Metavar -> EvalT Ty
+normalizeMeta n env m = undefined
+
+-- | Normalize a type.
+normalizeTy :: Lvl -> TEnv -> Ty -> EvalT Ty
+normalizeTy n env = \case
+  Data l sp     -> Data l <$> normalizeTSp n env sp
+  a@Meta{}      -> quoteTy n =<< evalTy env a
+  a@FreshMeta{} -> quoteTy n =<< evalTy env a
+  Tuple as      -> Tuple <$> (normalizeTy n env <$$> as)
+  World a       -> World <$> normalizeTy n env a
+  Fun a b       -> Fun <$> normalizeTy n env a <*> normalizeTy n env b
+  ForAll x a    -> ForAll x <$> normalizeTy (n + 1) (env :> VTyVar n) a
+  a             -> pure a
+
+-- | Normalize a type spine.
+normalizeTSp :: Lvl -> TEnv -> TSpine -> EvalT TSpine
+normalizeTSp n env = \case
+  []      -> pure []
+  sp :> a -> (:>) <$> normalizeTSp n env sp <*> normalizeTy n env a
+
+-- | Normalize the types in a term.
+normalizeTm :: Lvl -> TEnv -> Tm -> EvalT Tm
+normalizeTm n env = \case
+  Lam x a t     -> Lam x <$> normalizeTy n env a <*> normalizeTm n env t
+  LamI x t      -> LamI x <$> normalizeTm (n + 1) (env :> VTyVar n) t
+  App t u       -> App <$> normalizeTm n env t <*> normalizeTm n env u
+  AppI t a      -> AppI <$> normalizeTm n env t <*> normalizeTy n env a
+  Let x a t u   -> Let x <$> normalizeTy n env a <*> normalizeTm n env t <*> normalizeTm n env u
+  Tup ts        -> Tup <$> (normalizeTm n env <$$> ts)
+  UnOp op t     -> UnOp op <$> normalizeTm n env t
+  BinOp op t u  -> BinOp op <$> normalizeTm n env t <*> normalizeTm n env u
+  UnFunc f t    -> UnFunc f <$> normalizeTm n env t
+  BinFunc f t u -> BinFunc f <$> normalizeTm n env t <*> normalizeTm n env u
+  Case t bs     -> Case <$> normalizeTm n env t <*> (normalizeCaseBranch n env <$$> bs)
+  Bind x a t u  -> Bind x <$> normalizeTy n env a <*> normalizeTm n env t <*> normalizeTm n env u
+  t             -> pure t
+  where
+    normalizeCaseBranch n env (p, t) = case p of
+      PCtr l args -> (p, ) <$> normalizeWithArgs args n env t
+      _           -> (p, ) <$> normalizeTm n env t
+    normalizeWithArgs args n env t = case args of
+      Right x : args  -> normalizeWithArgs args (n + 1) (env :> VTyVar n) t
+      _               -> normalizeTm n env t
+
+-- | Normalize the types in the given program by substituting the solutions
+-- of metavariables using the given metavariable mappings.
+--
+-- @since 1.0.0
+normalizeTypes :: Program -> EvalT Program
+normalizeTypes = \case
+  []      -> pure []
+  d : ds  -> (:) <$> normalizeDecl d <*> normalizeTypes ds
+  where
+    normalizeDecl = \case
+      Left td   -> pure $ Left td
+      Right tl  -> Right <$> normalizeTopLevelDef tl
+    normalizeTopLevelDef (TL l a t) = TL l <$> normalizeTy 0 [] a <*> normalizeTm 0 [] t
 
 -- | Information context for type values.
 --

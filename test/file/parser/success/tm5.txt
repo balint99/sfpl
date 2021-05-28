@@ -1,0 +1,8 @@
+let x : int
+      = 3;
+    y = x + 2;
+    id : @ a. a -> a
+      = \{a} x. x : a;
+    const : @ a b. a -> b -> a
+      = \x y. x
+in id (const (x : int) (y : int) : int) : int

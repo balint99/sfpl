@@ -1,0 +1,19 @@
+\a b c xs. case xs of {
+             []. 3;
+             x :: xs. case x of {
+                        3. 1;
+                        5. 0;
+                        _. case a of {
+                             2.0. 4;
+                             _. case b of {
+                                  'a'. 5;
+                                  _. case c of {
+                                       (d, _, f). case d of {
+                                                    left x. f x;
+                                                    right y. y
+                                                  }
+                                     }
+                                }
+                           }
+                      }
+           }

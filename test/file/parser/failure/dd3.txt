@@ -1,0 +1,3 @@
+data either a b
+  = left : a -> either a b
+  | right : b -> either a b
