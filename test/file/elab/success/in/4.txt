@@ -1,0 +1,35 @@
+data list a
+  = nil  : [a]
+  | cons : a -> [a] -> [a];
+
+map : @ a b. (a -> b) -> [a] -> [b]
+  = \f xs. case xs of {
+      []     . [];
+      x :: xs. f x :: map f xs
+    };
+
+data either a b
+  = left  : a -> either a b
+  | right : b -> either a b;
+
+either : @ a b c. (a -> c) -> (b -> c) -> either a b -> c
+  = \f g e. case e of {
+      left x . f x;
+      right y. g y
+    };
+
+seq : @ a b. % a -> % b -> % b
+  = \ma mb. do _ <- ma then mb;
+
+putc : char -> % ()
+  = \x. __putc x;
+
+puts : [char] -> % ()
+  = \xs. case xs of {
+      []     . % ();
+      x :: xs. putc x >> puts xs
+    };
+
+main : % ()
+  = puts (map (either (\(x : int). char x) (\x. x))
+         [left 97, left 98, right 'c', left 100, right 'e', right 'f']);

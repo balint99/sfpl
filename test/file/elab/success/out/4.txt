@@ -1,0 +1,36 @@
+data list a
+  = nil : [a]
+  | cons : a -> [a] -> [a];
+
+map : @ a b. (a -> b) -> [a] -> [b]
+  = \{a b} (f : a -> b)(xs : [a]). case xs of {
+                                     []. nil {b};
+                                     x :: xs. cons {b} (f x) (map {a, b} f xs)
+                                   };
+
+data either a b
+  = left : a -> either a b
+  | right : b -> either a b;
+
+either : @ a b c. (a -> c) -> (b -> c) -> either a b -> c
+  = \{a b c} (f : a -> c)(g : b -> c)(e : either a b). case e of {
+                                                         left x. f x;
+                                                         right y. g y
+                                                       };
+
+seq : @ a b. % a -> % b -> % b
+  = \{a b} (ma : % a)(mb : % b). do _ : a
+                                      <- ma
+                                 then mb;
+
+putc : char -> % ()
+  = \(x : char). __putc x;
+
+puts : [char] -> % ()
+  = \(xs : [char]). case xs of {
+                      []. % ();
+                      x :: xs. seq {(), ()} (putc x) (puts xs)
+                    };
+
+main : % ()
+  = puts (map {either int char, char} (either {int, char, char} (\(x : int). char x) (\(x : char). x)) (cons {either int char} (left {int, char} 97) (cons {either int char} (left {int, char} 98) (cons {either int char} (right {int, char} 'c') (cons {either int char} (left {int, char} 100) (cons {either int char} (right {int, char} 'e') (cons {either int char} (right {int, char} 'f') (nil {either int char}))))))));

@@ -13,20 +13,20 @@ import Text.Megaparsec.Pos (SourcePos)
 -- | Class for syntactic categories of the presyntax.
 --
 -- @since 1.0.0
-class Raw (a :: Type) where
+class Raw (r :: Type) where
   -- | Get the span of an element.
-  spanOf :: a -> Span
+  spanOf :: r -> Span
 
 -- | Get the starting position of an element.
 --
 -- @since 1.0.0
-begOf :: Raw a => a -> BegPos
+begOf :: Raw r => r -> BegPos
 begOf = fst . spanOf
 
 -- | Get the ending position of an element.
 --
 -- @since 1.0.0
-endOf :: Raw a => a -> EndPos
+endOf :: Raw r => r -> EndPos
 endOf = snd . spanOf
 
 -- | Source position at the beginning of a syntactic element.

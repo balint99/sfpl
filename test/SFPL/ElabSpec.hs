@@ -18,16 +18,16 @@ import Text.Megaparsec (errorBundlePretty)
 prefix :: FilePath
 prefix = "test/file/elab/"
 
-actualPath :: FilePath -> FilePath -> FilePath -> FilePath
-actualPath group dir path =
-  prefix ++ group ++ "/" ++ dir ++ "/" ++ path ++ ".txt"
+actualPath :: FilePath -> FilePath -> FilePath
+actualPath group path =
+  prefix ++ group ++ "/" ++ path ++ ".txt"
 
 diag :: a -> (a, a)
 diag x = (x, x)
 
 shouldSucceed :: FilePath -> Expectation
-shouldSucceed (diag -> ( actualPath "success" "in"  -> inp
-                       , actualPath "success" "out" -> out)) = do
+shouldSucceed (diag -> ( actualPath "success" . ("in/"  ++) -> inp
+                       , actualPath "success" . ("out/" ++) -> out)) = do
   src <- readFile inp
   exp <- readFile out
   let res = parseProgram inp src
@@ -50,6 +50,28 @@ shouldSucceed (diag -> ( actualPath "success" "in"  -> inp
                     , exp
                     , "but got:"
                     , act ]
+
+shouldFail :: FilePath -> ([ElabError] -> Bool) -> Expectation
+shouldFail (actualPath "failure" -> file) p = do
+  src <- readFile file
+  let res = parseProgram file src
+  case res of
+    Left bundle -> expectationFailure $
+      "failed with parse error:\n" ++ errorBundlePretty bundle
+    Right prog  -> do
+      let src' = arr $ lines src :: SourceFile 
+          (res, metas) = runElab (checkProgram prog)
+      case res of
+        Left errors       -> unless (p errors) $ expectationFailure $
+             "errors didn't satisfy the predicate:\n"
+          ++ showPretty (src', metas) errors
+        Right (prog, cxt) -> do
+          let PrintCxt _ ts cs _ tls = printInfo cxt
+              pcxt = progPCxt (reverse tls) (metaNames metas) (reverse ts) (reverse cs)
+              prog' = normalizeTypes prog metas
+              out = showPretty pcxt prog'
+          expectationFailure $
+            "expected error, but got:\n" ++ out
 
 spec :: Spec
 spec = do

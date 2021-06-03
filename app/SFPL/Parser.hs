@@ -8,6 +8,7 @@ module SFPL.Parser
     ty,
     pat,
     tm,
+    topLevelDef,
     constructor,
     dataDecl,
     typeDecl,

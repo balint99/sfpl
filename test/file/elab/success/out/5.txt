@@ -1,0 +1,10 @@
+data T
+  = T : @ a. (a -> int) -> a -> T;
+
+increment : T -> T
+  = \(t : T). case t of {
+                T {a} f x. T {a} (\(x : a). f x + 1) x
+              };
+
+initT : @ a. a -> T
+  = \{a}. T {a} (\(_ : a). 0);

@@ -1,0 +1,7 @@
+data T = T : @ a. (a -> int) -> a -> T;
+
+increment : T -> T
+  = \t. case t of { T f x. T (\x. f x + 1) x };
+
+initT : @ a. a -> T
+  = \{a}. T {a} (\_. 0);

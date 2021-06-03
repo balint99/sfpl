@@ -70,6 +70,6 @@ test-suite test
     import:           deps, test-deps
     type:             exitcode-stdio-1.0
     main-is:          Main.hs
-    other-modules:    SFPL.ElabSpec, SFPL.EvalSpec, SFPL.ParserSpec, Utils
+    other-modules:    SFPL.ElabSpec, SFPL.EvalSpec, SFPL.ParserSpec
     build-depends:    sfpl-internal
     hs-source-dirs:   test
